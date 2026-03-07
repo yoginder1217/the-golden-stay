@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  /* FIX: Removed "-DEFAULT" so bg-golden works */
+  --color-golden: #D4AF37; 
+  
+  --color-golden-light: #F3E5AB;
+  --color-golden-dark: #AA8C2C;
+  --color-charcoal: #1A1A1A;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Playfair Display', serif;
+}
+
+body {
+  background-color: #F9FAFB;
+  color: #1A1A1A;
+  font-family: 'Lato', sans-serif;
+}
