@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContextUtils';
 import { Helmet } from 'react-helmet-async';
-import { AlertCircle, UserPlus } from 'lucide-react';
+import { AlertCircle, UserPlus, CheckCircle, Mail } from 'lucide-react';
 
 const Signup = () => {
   const { signup } = useAuth();
@@ -11,6 +11,7 @@ const Signup = () => {
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const handleChange = (e) => {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
@@ -32,8 +33,14 @@ const Signup = () => {
 
     setLoading(true);
     try {
-      await signup(form.name.trim(), form.email, form.password);
-      navigate('/dashboard', { replace: true });
+      const data = await signup(form.name.trim(), form.email, form.password);
+      if (data?.session) {
+        // Email confirmation is OFF — user is immediately logged in
+        navigate('/dashboard', { replace: true });
+      } else {
+        // Email confirmation is ON — show "check your email" screen
+        setEmailSent(true);
+      }
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
@@ -46,6 +53,27 @@ const Signup = () => {
       <Helmet><title>Sign Up | The Golden Stay</title></Helmet>
 
       <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md border border-gray-100">
+
+        {/* Email confirmation pending screen */}
+        {emailSent ? (
+          <div className="text-center">
+            <div className="w-16 h-16 bg-golden/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Mail size={32} className="text-golden" />
+            </div>
+            <h2 className="text-2xl font-bold text-charcoal mb-2">Check your email</h2>
+            <p className="text-gray-500 text-sm mb-2">
+              We sent a confirmation link to
+            </p>
+            <p className="font-bold text-charcoal mb-6">{form.email}</p>
+            <p className="text-gray-400 text-xs mb-6">
+              Click the link in the email to activate your account, then come back to log in.
+            </p>
+            <Link to="/login" className="block w-full text-center bg-golden hover:bg-golden-dark text-white font-bold py-3 rounded-xl transition">
+              Go to Login
+            </Link>
+          </div>
+        ) : (
+        <>
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-charcoal mb-1">Create Account</h2>
           <p className="text-gray-500 text-sm">Join The Golden Stay family</p>
@@ -126,6 +154,8 @@ const Signup = () => {
           Already have an account?{' '}
           <Link to="/login" className="text-golden font-bold hover:underline">Sign in</Link>
         </p>
+        </>
+        )}
       </div>
     </div>
   );
