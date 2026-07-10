@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
+import { useSearchParams } from 'react-router-dom';
 import { properties } from '../data/properties';
 import PropertyCard from '../components/PropertyCard';
-import { Filter, Map as MapIcon } from 'lucide-react';
+import { X } from 'lucide-react';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -20,13 +21,25 @@ const itemVariants = {
 
 const Properties = () => {
   const [activeFilter, setActiveFilter] = useState('All');
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const filteredProperties = activeFilter === 'All'
-    ? properties
-    : properties.filter(property => property.type === activeFilter);
+  const locationQuery = searchParams.get('location') || '';
+  const checkinQuery = searchParams.get('checkin') || '';
+  const guestsQuery = searchParams.get('guests') || '';
+
+  const hasSearchQuery = locationQuery || checkinQuery || guestsQuery;
+
+  const clearSearch = () => setSearchParams({});
+
+  const filteredProperties = properties.filter(property => {
+    const matchesType = activeFilter === 'All' || property.type === activeFilter;
+    const matchesLocation = !locationQuery ||
+      property.location.toLowerCase().includes(locationQuery.toLowerCase()) ||
+      property.title.toLowerCase().includes(locationQuery.toLowerCase());
+    return matchesType && matchesLocation;
+  });
 
   return (
-    // FIX 1: Added 'overflow-x-hidden' here to kill the scrollbar
     <div className="bg-gray-50 min-h-screen pb-20 overflow-x-hidden">
       <Helmet>
         <title>The Golden Stay | Luxury 3BHK Apartments & Homestays</title>
@@ -42,7 +55,7 @@ const Properties = () => {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="text-4xl md:text-6xl font-bold mb-4 font-serif" // Adjusted text size for mobile
+            className="text-4xl md:text-6xl font-bold mb-4 font-serif"
           >
             Our Exclusive Collection
           </motion.h1>
@@ -80,15 +93,30 @@ const Properties = () => {
             ))}
           </div>
 
-          <div className="flex gap-3 w-full md:w-auto justify-center md:justify-end">
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:text-golden transition">
-              <Filter size={18} /> Filters
+          {hasSearchQuery && (
+            <button
+              onClick={clearSearch}
+              className="flex items-center gap-2 px-4 py-2 bg-golden/10 border border-golden/30 rounded-lg text-sm font-bold text-golden-dark hover:bg-golden/20 transition whitespace-nowrap"
+            >
+              <X size={16} /> Clear Search
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:text-golden transition">
-              <MapIcon size={18} /> Map View
-            </button>
-          </div>
+          )}
         </motion.div>
+
+        {/* --- Active Search Banner --- */}
+        {hasSearchQuery && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-6 p-4 bg-white rounded-xl border border-golden/20 shadow-sm flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600"
+          >
+            <span className="font-bold text-charcoal">Showing results for:</span>
+            {locationQuery && <span>📍 <strong>{locationQuery}</strong></span>}
+            {checkinQuery && <span>📅 Check-in: <strong>{new Date(checkinQuery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>}
+            {guestsQuery && <span>👥 <strong>{guestsQuery}</strong></span>}
+            <span className="ml-auto text-golden-dark font-bold">{filteredProperties.length} {filteredProperties.length === 1 ? 'property' : 'properties'} found</span>
+          </motion.div>
+        )}
 
         {/* --- Property Grid --- */}
         <motion.div
@@ -113,10 +141,21 @@ const Properties = () => {
                 </motion.div>
               ))
             ) : (
-              <div className="col-span-full text-center py-20">
-                <h3 className="text-2xl text-gray-400 font-bold">No properties found.</h3>
-                <p className="text-gray-400">Try selecting a different category.</p>
-              </div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="col-span-full text-center py-20"
+              >
+                <h3 className="text-2xl text-gray-400 font-bold mb-2">No properties found.</h3>
+                <p className="text-gray-400 mb-4">
+                  {locationQuery ? `We don't have listings in "${locationQuery}" yet.` : 'Try selecting a different category.'}
+                </p>
+                {hasSearchQuery && (
+                  <button onClick={clearSearch} className="text-golden font-bold underline">
+                    Clear search and view all
+                  </button>
+                )}
+              </motion.div>
             )}
           </AnimatePresence>
         </motion.div>

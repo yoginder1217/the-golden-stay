@@ -1,5 +1,5 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, ArrowRight, Star, Shield, Coffee, Wifi } from 'lucide-react';
 import { properties } from '../data/properties';
@@ -25,6 +25,19 @@ const staggerContainer = {
 };
 
 const Home = () => {
+  const navigate = useNavigate();
+  const today = new Date().toISOString().split('T')[0];
+
+  const [search, setSearch] = useState({ location: '', checkin: '', guests: '2 Adults, 1 Child' });
+
+  const handleSearch = () => {
+    const params = new URLSearchParams();
+    if (search.location.trim()) params.set('location', search.location.trim());
+    if (search.checkin) params.set('checkin', search.checkin);
+    if (search.guests) params.set('guests', search.guests);
+    navigate(`/properties?${params.toString()}`);
+  };
+
   return (
     <div className="overflow-hidden bg-white">
       <Helmet>
@@ -80,20 +93,44 @@ const Home = () => {
           >
             <div className="w-full md:flex-1 px-6 py-4 border-b md:border-b-0 md:border-r border-white/10 text-left">
               <label className="block text-xs font-bold text-gray-300 uppercase tracking-wide mb-1">Location</label>
-              <input type="text" placeholder="Khair, Aligarh..." className="w-full bg-transparent outline-none text-white font-medium placeholder-gray-400" />
+              <input
+                type="text"
+                placeholder="Noida, Indirapuram..."
+                value={search.location}
+                onChange={(e) => setSearch(s => ({ ...s, location: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                className="w-full bg-transparent outline-none text-white font-medium placeholder-gray-400"
+              />
             </div>
             <div className="w-full md:flex-1 px-6 py-4 border-b md:border-b-0 md:border-r border-white/10 text-left">
               <label className="block text-xs font-bold text-gray-300 uppercase tracking-wide mb-1">Check-in</label>
-              <input type="date" className="w-full bg-transparent outline-none text-white font-medium [color-scheme:dark]" />
+              <input
+                type="date"
+                min={today}
+                value={search.checkin}
+                onChange={(e) => setSearch(s => ({ ...s, checkin: e.target.value }))}
+                className="w-full bg-transparent outline-none text-white font-medium [color-scheme:dark]"
+              />
             </div>
             <div className="w-full md:flex-1 px-6 py-4 text-left">
               <label className="block text-xs font-bold text-gray-300 uppercase tracking-wide mb-1">Guests</label>
-              <select className="w-full bg-transparent outline-none text-white font-medium [&>option]:text-black">
+              <select
+                value={search.guests}
+                onChange={(e) => setSearch(s => ({ ...s, guests: e.target.value }))}
+                className="w-full bg-transparent outline-none text-white font-medium [&>option]:text-black"
+              >
+                <option>1 Adult</option>
+                <option>2 Adults</option>
                 <option>2 Adults, 1 Child</option>
+                <option>2 Adults, 2 Children</option>
+                <option>4 Adults</option>
                 <option>4 Adults, 2 Children</option>
               </select>
             </div>
-            <button className="w-full md:w-auto mt-2 md:mt-0 bg-gradient-to-r from-golden via-golden-dark to-golden text-white rounded-full p-4 md:px-10 transition-all duration-300 font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-golden/50">
+            <button
+              onClick={handleSearch}
+              className="w-full md:w-auto mt-2 md:mt-0 bg-gradient-to-r from-golden via-golden-dark to-golden text-white rounded-full p-4 md:px-10 transition-all duration-300 font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-golden/50"
+            >
               <Search size={20} /> Search
             </button>
           </motion.div>
