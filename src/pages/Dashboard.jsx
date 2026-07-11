@@ -23,8 +23,8 @@ const Dashboard = () => {
     try {
       const data = await getUserBookings(user.id);
       setBookings(data);
-    } catch {
-      setFetchError('Could not load bookings. Please try again.');
+    } catch (err) {
+      setFetchError(err?.message || 'Could not load bookings. Please try again.');
     } finally {
       setLoadingBookings(false);
     }
