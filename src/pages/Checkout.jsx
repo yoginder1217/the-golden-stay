@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { MapPin, Calendar, Users, ShieldCheck, AlertCircle } from 'lucide-react';
+import { MapPin, Calendar, Users, ShieldCheck, AlertCircle, LogIn } from 'lucide-react';
+import { useAuth } from '../context/AuthContextUtils';
+import { saveBooking } from '../lib/bookings';
 
 const formatDate = (dateStr) =>
   dateStr
@@ -11,6 +13,7 @@ const formatDate = (dateStr) =>
 const Checkout = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
     if (!state?.property) {
@@ -25,7 +28,48 @@ const Checkout = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
+  // Pre-fill form from logged-in user
+  useEffect(() => {
+    if (user) {
+      setForm(f => ({
+        ...f,
+        name: f.name || user.user_metadata?.full_name || '',
+        email: f.email || user.email || '',
+      }));
+    }
+  }, [user]);
+
   if (!state?.property) return null;
+
+  // Show login prompt if not authenticated
+  if (!authLoading && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-10 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-golden/10 rounded-full flex items-center justify-center mx-auto mb-5">
+            <LogIn size={28} className="text-golden" />
+          </div>
+          <h2 className="text-2xl font-bold text-charcoal mb-2">Sign in to continue</h2>
+          <p className="text-gray-500 text-sm mb-8">
+            You need an account to complete your booking. Your selected dates and property will be waiting.
+          </p>
+          <Link
+            to="/login"
+            state={{ from: '/checkout' }}
+            className="block w-full bg-golden hover:bg-golden-dark text-white font-bold py-3 rounded-xl transition mb-3"
+          >
+            Log In
+          </Link>
+          <Link
+            to="/signup"
+            className="block w-full border border-gray-200 hover:border-golden text-gray-600 hover:text-golden font-bold py-3 rounded-xl transition"
+          >
+            Create Account
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -42,9 +86,37 @@ const Checkout = () => {
   };
 
   const openRazorpay = () => {
-    const bookingId = 'TGS-' + Date.now().toString(36).toUpperCase();
+    const bookingRef = 'TGS-' + Date.now().toString(36).toUpperCase();
 
-    const onSuccess = (paymentId) => {
+    const onSuccess = async (paymentId) => {
+      // Save booking to Supabase
+      try {
+        await saveBooking({
+          user_id: user.id,
+          property_id: property.id,
+          property_title: property.title,
+          property_location: property.location,
+          property_image: property.image,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          guests,
+          nights,
+          subtotal,
+          cleaning_fee: cleaningFee,
+          service_fee: serviceFee,
+          total,
+          guest_name: form.name,
+          guest_email: form.email,
+          guest_phone: form.phone,
+          payment_id: paymentId,
+          booking_ref: bookingRef,
+          status: 'confirmed',
+        });
+      } catch (err) {
+        console.error('Booking save failed:', err.message);
+        // Don't block the user — still show success
+      }
+
       navigate('/booking-success', {
         state: {
           property,
@@ -56,7 +128,7 @@ const Checkout = () => {
           guestName: form.name,
           guestEmail: form.email,
           paymentId,
-          bookingId,
+          bookingId: bookingRef,
         },
       });
     };
@@ -71,34 +143,28 @@ const Checkout = () => {
         image: '/logo.png',
         handler: (response) => onSuccess(response.razorpay_payment_id),
         prefill: { name: form.name, email: form.email, contact: form.phone },
-        notes: { booking_id: bookingId, property: property.title },
+        notes: { booking_ref: bookingRef, property: property.title },
         theme: { color: '#D4AF37' },
         modal: { ondismiss: () => setLoading(false) },
       };
       const rzp = new window.Razorpay(options);
       rzp.open();
     } else {
-      // Razorpay script failed to load — graceful fallback
-      setTimeout(() => onSuccess('DEMO-' + Date.now()), 1200);
+      onSuccess('DEMO-' + Date.now());
     }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const errs = validate();
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
+    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setLoading(true);
     openRazorpay();
   };
 
   return (
     <div className="bg-gray-50 min-h-screen py-12">
-      <Helmet>
-        <title>Checkout | The Golden Stay</title>
-      </Helmet>
+      <Helmet><title>Checkout | The Golden Stay</title></Helmet>
 
       <div className="max-w-6xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-charcoal mb-2">Confirm Your Stay</h1>
@@ -106,7 +172,7 @@ const Checkout = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
 
-          {/* --- Left: Guest Details Form --- */}
+          {/* Left: Guest Details */}
           <div className="lg:col-span-3">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
               <h2 className="text-xl font-bold text-charcoal mb-6">Your Details</h2>
@@ -162,18 +228,12 @@ const Checkout = () => {
                     className="w-full bg-golden hover:bg-golden-dark disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition text-lg flex items-center justify-center gap-2 shadow-lg"
                   >
                     {loading ? (
-                      <>
-                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                        </svg>
-                        Processing…
-                      </>
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
                     ) : (
-                      <>
-                        <ShieldCheck size={20} />
-                        Pay ₹{total?.toLocaleString('en-IN')} Securely
-                      </>
+                      <><ShieldCheck size={20} /> Pay ₹{total?.toLocaleString('en-IN')} Securely</>
                     )}
                   </button>
                   <p className="text-xs text-gray-400 text-center mt-3 flex items-center justify-center gap-1">
@@ -184,31 +244,26 @@ const Checkout = () => {
             </div>
           </div>
 
-          {/* --- Right: Order Summary --- */}
+          {/* Right: Order Summary */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-24">
-              <img
-                src={property.image}
-                alt={property.title}
-                className="w-full h-40 object-cover rounded-xl mb-5"
-              />
-
+              <img src={property.image} alt={property.title} className="w-full h-40 object-cover rounded-xl mb-5" />
               <h3 className="text-lg font-bold text-charcoal mb-1">{property.title}</h3>
               <p className="text-gray-500 text-sm flex items-center gap-1 mb-5">
                 <MapPin size={14} className="text-golden" /> {property.location}
               </p>
 
               <div className="space-y-3 text-sm mb-5">
-                <div className="flex items-center gap-3 text-gray-600 bg-gray-50 rounded-lg p-3">
+                <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-3">
                   <Calendar size={16} className="text-golden shrink-0" />
                   <div>
                     <p className="font-bold text-charcoal">{formatDate(checkin)} → {formatDate(checkout)}</p>
                     <p className="text-gray-400">{nights} {nights === 1 ? 'night' : 'nights'}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 text-gray-600 bg-gray-50 rounded-lg p-3">
+                <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-3">
                   <Users size={16} className="text-golden shrink-0" />
-                  <span className="font-medium">{guests} {guests === 1 ? 'guest' : 'guests'}</span>
+                  <span className="font-medium text-gray-600">{guests} {guests === 1 ? 'guest' : 'guests'}</span>
                 </div>
               </div>
 
@@ -218,12 +273,10 @@ const Checkout = () => {
                   <span>₹{subtotal?.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
-                  <span>Cleaning fee</span>
-                  <span>₹{cleaningFee}</span>
+                  <span>Cleaning fee</span><span>₹{cleaningFee}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
-                  <span>Service fee</span>
-                  <span>₹{serviceFee}</span>
+                  <span>Service fee</span><span>₹{serviceFee}</span>
                 </div>
               </div>
 
