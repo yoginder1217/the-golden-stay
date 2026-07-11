@@ -22,6 +22,7 @@ import Dashboard from './pages/Dashboard';
 import NotFound from './pages/NotFound';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
+import OwnerDashboard from './pages/OwnerDashboard';
 
 function App() {
   return (
@@ -53,6 +54,11 @@ function App() {
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/owner" element={
+                <ProtectedRoute>
+                  <OwnerDashboard />
                 </ProtectedRoute>
               } />
 

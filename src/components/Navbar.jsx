@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContextUtils';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, User, LogOut, LayoutDashboard, ChevronDown } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, ChevronDown, ShieldCheck } from 'lucide-react';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -18,6 +18,7 @@ const Navbar = () => {
   };
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Account';
+  const isAdmin = user?.email === import.meta.env.VITE_ADMIN_EMAIL;
 
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50">
@@ -69,6 +70,15 @@ const Navbar = () => {
                     >
                       <LayoutDashboard size={16} /> My Bookings
                     </Link>
+                    {isAdmin && (
+                      <Link
+                        to="/owner"
+                        onClick={closeMenu}
+                        className="flex items-center gap-2 px-4 py-3 text-sm text-golden font-bold hover:bg-golden/5 transition border-t border-gray-100"
+                      >
+                        <ShieldCheck size={16} /> Owner Dashboard
+                      </Link>
+                    )}
                     <button
                       onClick={handleLogout}
                       className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition"
@@ -119,6 +129,11 @@ const Navbar = () => {
                   <Link to="/dashboard" onClick={closeMenu} className="flex items-center gap-2 px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-golden hover:bg-gray-50">
                     <LayoutDashboard size={18} /> My Bookings
                   </Link>
+                  {isAdmin && (
+                    <Link to="/owner" onClick={closeMenu} className="flex items-center gap-2 px-3 py-3 rounded-md text-base font-bold text-golden hover:bg-golden/5">
+                      <ShieldCheck size={18} /> Owner Dashboard
+                    </Link>
+                  )}
                   <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-3 rounded-md text-base font-medium text-red-600 hover:bg-red-50">
                     <LogOut size={18} /> Sign Out
                   </button>
