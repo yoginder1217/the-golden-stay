@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContextUtils';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, LayoutDashboard, ChevronDown, ShieldCheck } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, ChevronDown, ShieldCheck, Heart } from 'lucide-react';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -70,6 +70,13 @@ const Navbar = () => {
                     >
                       <LayoutDashboard size={16} /> My Bookings
                     </Link>
+                    <Link
+                      to="/wishlist"
+                      onClick={closeMenu}
+                      className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 hover:text-golden transition"
+                    >
+                      <Heart size={16} /> Wishlist
+                    </Link>
                     {isAdmin && (
                       <Link
                         to="/owner"
@@ -128,6 +135,9 @@ const Navbar = () => {
                   </div>
                   <Link to="/dashboard" onClick={closeMenu} className="flex items-center gap-2 px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-golden hover:bg-gray-50">
                     <LayoutDashboard size={18} /> My Bookings
+                  </Link>
+                  <Link to="/wishlist" onClick={closeMenu} className="flex items-center gap-2 px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-golden hover:bg-gray-50">
+                    <Heart size={18} /> Wishlist
                   </Link>
                   {isAdmin && (
                     <Link to="/owner" onClick={closeMenu} className="flex items-center gap-2 px-3 py-3 rounded-md text-base font-bold text-golden hover:bg-golden/5">

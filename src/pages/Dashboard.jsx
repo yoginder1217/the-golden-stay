@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContextUtils';
 import { getUserBookings } from '../lib/bookings';
 import BookingCard from '../components/BookingCard';
 import { Helmet } from 'react-helmet-async';
-import { Home, Calendar, User, LogOut, RefreshCw } from 'lucide-react';
+import { Home, Calendar, User, LogOut, RefreshCw, Heart, Award } from 'lucide-react';
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -39,6 +39,14 @@ const Dashboard = () => {
 
   const upcoming = bookings.filter(b => new Date(b.checkin_date) >= today);
   const past = bookings.filter(b => new Date(b.checkin_date) < today);
+
+  // Loyalty points: ₹100 spent = 1 point
+  const totalPoints = useMemo(() =>
+    bookings.reduce((s, b) => s + Math.floor((b.total || 0) / 100), 0),
+  [bookings]);
+  const tier = totalPoints >= 150 ? { label: 'Gold', color: 'text-yellow-600 bg-yellow-50 border-yellow-200' }
+    : totalPoints >= 50 ? { label: 'Silver', color: 'text-gray-500 bg-gray-50 border-gray-300' }
+    : { label: 'Bronze', color: 'text-orange-600 bg-orange-50 border-orange-200' };
 
   const BookingsSection = ({ title, items, empty }) => (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6">
@@ -105,6 +113,27 @@ const Dashboard = () => {
           >
             <LogOut size={16} /> Sign Out
           </button>
+        </div>
+
+        {/* Loyalty Points */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-golden/10 flex items-center justify-center">
+              <Award size={24} className="text-golden" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-0.5">Golden Points</p>
+              <p className="text-2xl font-bold text-charcoal">{loadingBookings ? '—' : totalPoints} pts</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className={`inline-flex items-center gap-1.5 text-sm font-bold px-4 py-2 rounded-full border ${tier.color}`}>
+              <Award size={14} /> {tier.label} Member
+            </span>
+            <Link to="/wishlist" className="flex items-center gap-1.5 text-sm font-bold text-golden border border-golden/30 hover:bg-golden/5 px-4 py-2 rounded-full transition">
+              <Heart size={14} className="fill-golden" /> My Wishlist
+            </Link>
+          </div>
         </div>
 
         {/* Account Info */}

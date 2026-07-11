@@ -23,6 +23,7 @@ import NotFound from './pages/NotFound';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
 import OwnerDashboard from './pages/OwnerDashboard';
+import Wishlist from './pages/Wishlist';
 
 function App() {
   return (
@@ -59,6 +60,11 @@ function App() {
               <Route path="/owner" element={
                 <ProtectedRoute>
                   <OwnerDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/wishlist" element={
+                <ProtectedRoute>
+                  <Wishlist />
                 </ProtectedRoute>
               } />
 

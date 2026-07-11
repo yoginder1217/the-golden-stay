@@ -1,21 +1,23 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, MapPin } from 'lucide-react';
+import WishlistButton from './WishlistButton';
 
 const PropertyCard = ({ property }) => {
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
       <div className="relative h-64">
-        <img 
-          src={property.image} 
-          alt={property.title} 
+        <img
+          src={property.image}
+          alt={property.title}
           className="w-full h-full object-cover"
         />
         <div className="absolute top-4 right-4 bg-white px-2 py-1 rounded-lg text-sm font-bold shadow-sm">
           ₹{property.price}/night
         </div>
+        <WishlistButton property={property} className="absolute top-4 left-4" />
       </div>
-      
+
       <div className="p-5">
         <div className="flex justify-between items-start mb-2">
           <h3 className="text-lg font-bold text-charcoal">{property.title}</h3>
@@ -24,7 +26,7 @@ const PropertyCard = ({ property }) => {
             {property.rating}
           </div>
         </div>
-        
+
         <div className="flex items-center text-gray-500 mb-4 text-sm">
           <MapPin size={16} className="mr-1" />
           {property.location}
@@ -43,7 +45,7 @@ const PropertyCard = ({ property }) => {
           )}
         </div>
 
-        <Link 
+        <Link
           to={`/property/${property.id}`}
           className="block w-full text-center bg-golden hover:bg-golden-dark text-white font-medium py-2 rounded-lg transition"
         >

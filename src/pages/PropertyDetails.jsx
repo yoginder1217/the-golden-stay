@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { properties } from '../data/properties';
-import { Wifi, Home, Star, MapPin, CheckCircle, ExternalLink, ArrowRight, Users, Calendar } from 'lucide-react';
+import { Wifi, Home, Star, MapPin, CheckCircle, ExternalLink, ArrowRight, Users, Calendar, MessageSquare, LogIn } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
+import WishlistButton from '../components/WishlistButton';
+import { StarPicker, StarDisplay } from '../components/StarRating';
+import { getPropertyReviews, submitReview } from '../lib/reviews';
+import { useAuth } from '../context/AuthContextUtils';
 
 const CLEANING_FEE = 500;
 const SERVICE_FEE = 300;
@@ -16,6 +20,7 @@ const formatDate = (dateStr) =>
 const PropertyDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const property = properties.find(p => p.id === parseInt(id, 10));
 
   const today = new Date().toISOString().split('T')[0];
@@ -24,6 +29,27 @@ const PropertyDetails = () => {
   const [checkout, setCheckout] = useState('');
   const [guests, setGuests] = useState('2');
   const [dateError, setDateError] = useState('');
+
+  // Reviews state
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' });
+  const [reviewError, setReviewError] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSuccess, setReviewSuccess] = useState(false);
+
+  useEffect(() => {
+    if (property?.id) {
+      getPropertyReviews(property.id)
+        .then(setReviews)
+        .catch(() => {})
+        .finally(() => setReviewsLoading(false));
+    }
+  }, [property?.id]);
+
+  const avgRating = reviews.length
+    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+    : null;
 
   const minCheckout = checkin
     ? new Date(new Date(checkin).getTime() + 86400000).toISOString().split('T')[0]
@@ -55,17 +81,40 @@ const PropertyDetails = () => {
     }
     navigate('/checkout', {
       state: {
-        property,
-        checkin,
-        checkout,
+        property, checkin, checkout,
         guests: parseInt(guests, 10),
-        nights,
-        subtotal,
+        nights, subtotal,
         cleaningFee: CLEANING_FEE,
         serviceFee: SERVICE_FEE,
         total,
       },
     });
+  };
+
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!reviewForm.rating) { setReviewError('Please select a star rating.'); return; }
+    if (!reviewForm.comment.trim()) { setReviewError('Please write a comment.'); return; }
+    setReviewSubmitting(true);
+    setReviewError('');
+    try {
+      const newReview = await submitReview({
+        user_id: user.id,
+        property_id: property.id,
+        property_title: property.title,
+        rating: reviewForm.rating,
+        comment: reviewForm.comment.trim(),
+        reviewer_name: user.user_metadata?.full_name || user.email.split('@')[0],
+      });
+      setReviews(prev => [newReview, ...prev]);
+      setReviewForm({ rating: 0, comment: '' });
+      setReviewSuccess(true);
+      setTimeout(() => setReviewSuccess(false), 3000);
+    } catch (err) {
+      setReviewError(err?.message || 'Failed to submit review.');
+    } finally {
+      setReviewSubmitting(false);
+    }
   };
 
   if (!property) {
@@ -88,30 +137,26 @@ const PropertyDetails = () => {
         <meta name="description" content={property.description} />
       </Helmet>
 
-      {/* --- Image Gallery (Hero) --- */}
+      {/* Image Gallery */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 1 }}
         className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 h-[50vh] md:h-[60vh] gap-1 md:gap-2 p-1 md:p-2"
       >
-        {/* Main Image */}
-        <div className="md:col-span-2 md:row-span-2 overflow-hidden rounded-xl">
+        <div className="md:col-span-2 md:row-span-2 overflow-hidden rounded-xl relative">
           <img src={property.image} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" alt={property.title} loading="eager" />
+          <WishlistButton property={property} className="absolute top-3 left-3" />
         </div>
-
         <div className="overflow-hidden rounded-xl hidden md:block">
           <img src="https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&q=80&w=600" className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" alt="Kitchen" loading="lazy" />
         </div>
-
         <div className="overflow-hidden rounded-xl hidden md:block">
           <img src="https://images.unsplash.com/photo-1617325247661-675ab4b64ae2?auto=format&fit=crop&q=80&w=600" className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" alt="Bedroom" loading="lazy" />
         </div>
-
         <div className="overflow-hidden rounded-xl hidden md:block">
           <img src="https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?auto=format&fit=crop&q=80&w=600" className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" alt="Living Room" loading="lazy" />
         </div>
-
         <div className="relative overflow-hidden rounded-xl hidden md:block">
           <img src="https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&q=80&w=600" className="w-full h-full object-cover transition-transform duration-700" alt="Bathroom" loading="lazy" />
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -124,13 +169,14 @@ const PropertyDetails = () => {
 
       <div className="max-w-7xl mx-auto px-4 py-12 grid grid-cols-1 lg:grid-cols-3 gap-16">
 
-        {/* --- Left Column: Details --- */}
+        {/* Left Column */}
         <motion.div
           initial={{ opacity: 0, x: -30 }}
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true }}
           className="lg:col-span-2"
         >
+          {/* Header */}
           <div className="flex justify-between items-start mb-6">
             <div>
               <h1 className="text-4xl font-bold text-charcoal mb-2 font-serif">{property.title}</h1>
@@ -140,13 +186,15 @@ const PropertyDetails = () => {
             </div>
             <div className="text-center bg-gray-50 px-4 py-2 rounded-lg border border-gray-200 shrink-0">
               <span className="text-2xl font-bold text-charcoal flex items-center gap-1 justify-center">
-                {property.rating} <Star size={20} className="fill-golden text-golden" />
+                {avgRating ?? property.rating} <Star size={20} className="fill-golden text-golden" />
               </span>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Rating</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">
+                {reviews.length > 0 ? `${reviews.length} review${reviews.length !== 1 ? 's' : ''}` : 'Rating'}
+              </p>
             </div>
           </div>
 
-          <div className="h-px w-full bg-gray-200 my-8"></div>
+          <div className="h-px w-full bg-gray-200 my-8" />
 
           <h2 className="text-2xl font-bold mb-6 font-serif">About this Homestay</h2>
           <p className="text-gray-600 leading-loose mb-10 text-lg">
@@ -162,9 +210,104 @@ const PropertyDetails = () => {
               </div>
             ))}
           </div>
+
+          {/* Reviews Section */}
+          <div className="border-t border-gray-100 pt-10">
+            <div className="flex items-center gap-3 mb-6">
+              <h2 className="text-2xl font-bold font-serif">Guest Reviews</h2>
+              {reviews.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <StarDisplay rating={parseFloat(avgRating)} size={16} />
+                  <span className="text-gray-500 text-sm font-medium">{avgRating} · {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Existing reviews */}
+            {reviewsLoading ? (
+              <p className="text-gray-400 text-sm">Loading reviews…</p>
+            ) : reviews.length === 0 ? (
+              <p className="text-gray-400 text-sm mb-8">No reviews yet. Be the first to share your experience!</p>
+            ) : (
+              <div className="space-y-5 mb-10">
+                {reviews.map(r => (
+                  <div key={r.id} className="bg-gray-50 rounded-2xl p-5">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-golden text-white flex items-center justify-center font-bold text-sm">
+                          {r.reviewer_name?.[0]?.toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-bold text-charcoal text-sm">{r.reviewer_name}</p>
+                          <p className="text-gray-400 text-xs">{formatDate(r.created_at)}</p>
+                        </div>
+                      </div>
+                      <StarDisplay rating={r.rating} size={14} />
+                    </div>
+                    <p className="text-gray-600 text-sm leading-relaxed mt-3">{r.comment}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Leave a Review */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-bold text-charcoal mb-4 flex items-center gap-2">
+                <MessageSquare size={16} className="text-golden" /> Leave a Review
+              </h3>
+
+              {!user ? (
+                <div className="text-center py-4">
+                  <p className="text-gray-500 text-sm mb-3">Sign in to share your experience.</p>
+                  <Link
+                    to="/login"
+                    state={{ from: `/property/${property.id}` }}
+                    className="inline-flex items-center gap-2 bg-golden hover:bg-golden-dark text-white font-bold px-5 py-2.5 rounded-xl transition text-sm"
+                  >
+                    <LogIn size={15} /> Sign In to Review
+                  </Link>
+                </div>
+              ) : reviewSuccess ? (
+                <div className="flex items-center gap-2 text-green-600 text-sm font-bold py-3">
+                  <CheckCircle size={18} /> Review submitted — thank you!
+                </div>
+              ) : (
+                <form onSubmit={handleReviewSubmit} className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 mb-2">Your rating</p>
+                    <StarPicker value={reviewForm.rating} onChange={r => setReviewForm(f => ({ ...f, rating: r }))} size={28} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 mb-2">Your review</p>
+                    <textarea
+                      value={reviewForm.comment}
+                      onChange={e => setReviewForm(f => ({ ...f, comment: e.target.value }))}
+                      placeholder="Share what you loved about your stay…"
+                      rows={3}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-golden/40"
+                    />
+                  </div>
+                  {reviewError && <p className="text-red-500 text-xs">{reviewError}</p>}
+                  <button
+                    type="submit"
+                    disabled={reviewSubmitting}
+                    className="bg-golden hover:bg-golden-dark disabled:opacity-60 text-white font-bold px-6 py-2.5 rounded-xl transition text-sm flex items-center gap-2"
+                  >
+                    {reviewSubmitting ? (
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                    ) : <MessageSquare size={14} />}
+                    Submit Review
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
         </motion.div>
 
-        {/* --- Right Column: Booking Widget --- */}
+        {/* Right Column: Booking Widget */}
         <div className="relative">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -172,7 +315,6 @@ const PropertyDetails = () => {
             transition={{ delay: 0.5 }}
             className="bg-white p-8 rounded-2xl shadow-2xl border border-gray-100 sticky top-24"
           >
-            {/* Price Header */}
             <div className="flex justify-between items-end mb-6">
               <div>
                 <span className="text-3xl font-bold text-charcoal">₹{property.price.toLocaleString('en-IN')}</span>
@@ -181,7 +323,6 @@ const PropertyDetails = () => {
               <span className="text-green-600 text-sm font-bold bg-green-50 px-2 py-1 rounded">Available</span>
             </div>
 
-            {/* Date & Guest Pickers */}
             <div className="border border-gray-200 rounded-xl overflow-hidden mb-4">
               <div className="grid grid-cols-2 divide-x divide-gray-200">
                 <div className="p-3">
@@ -227,12 +368,9 @@ const PropertyDetails = () => {
             </div>
 
             {dateError && (
-              <p className="text-red-500 text-xs font-medium mb-3 flex items-center gap-1">
-                ⚠ {dateError}
-              </p>
+              <p className="text-red-500 text-xs font-medium mb-3">⚠ {dateError}</p>
             )}
 
-            {/* Live Price Breakdown */}
             {nights > 0 && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
@@ -244,21 +382,17 @@ const PropertyDetails = () => {
                   <span>₹{subtotal.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
-                  <span>Cleaning fee</span>
-                  <span>₹{CLEANING_FEE}</span>
+                  <span>Cleaning fee</span><span>₹{CLEANING_FEE}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
-                  <span>Service fee</span>
-                  <span>₹{SERVICE_FEE}</span>
+                  <span>Service fee</span><span>₹{SERVICE_FEE}</span>
                 </div>
                 <div className="flex justify-between font-bold text-charcoal pt-2 border-t border-gray-100">
-                  <span>Total</span>
-                  <span>₹{total.toLocaleString('en-IN')}</span>
+                  <span>Total</span><span>₹{total.toLocaleString('en-IN')}</span>
                 </div>
               </motion.div>
             )}
 
-            {/* Book Direct CTA */}
             <button
               onClick={handleBookDirect}
               className="w-full flex justify-between items-center bg-golden hover:bg-golden-dark text-white font-bold py-4 px-6 rounded-xl transition shadow-lg hover:shadow-xl mb-3"
@@ -267,46 +401,29 @@ const PropertyDetails = () => {
               <ArrowRight size={18} />
             </button>
 
-            {/* Divider */}
             <div className="flex items-center gap-3 my-4">
-              <div className="flex-1 h-px bg-gray-200"></div>
+              <div className="flex-1 h-px bg-gray-200" />
               <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">or book via</span>
-              <div className="flex-1 h-px bg-gray-200"></div>
+              <div className="flex-1 h-px bg-gray-200" />
             </div>
 
-            {/* External Platform Buttons */}
             <div className="space-y-3">
               {property.links?.airbnb && (
-                <a
-                  href={property.links.airbnb}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full flex justify-between items-center bg-[#FF5A5F] hover:bg-[#E00007] text-white font-bold py-3 px-5 rounded-xl transition group text-sm"
-                >
-                  <span>Airbnb</span>
-                  <ExternalLink size={16} className="opacity-70 group-hover:opacity-100" />
+                <a href={property.links.airbnb} target="_blank" rel="noopener noreferrer"
+                  className="w-full flex justify-between items-center bg-[#FF5A5F] hover:bg-[#E00007] text-white font-bold py-3 px-5 rounded-xl transition group text-sm">
+                  <span>Airbnb</span><ExternalLink size={16} className="opacity-70 group-hover:opacity-100" />
                 </a>
               )}
               {property.links?.mmt && (
-                <a
-                  href={property.links.mmt}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full flex justify-between items-center bg-[#E41F35] hover:bg-[#C21025] text-white font-bold py-3 px-5 rounded-xl transition group text-sm"
-                >
-                  <span>MakeMyTrip</span>
-                  <ExternalLink size={16} className="opacity-70 group-hover:opacity-100" />
+                <a href={property.links.mmt} target="_blank" rel="noopener noreferrer"
+                  className="w-full flex justify-between items-center bg-[#E41F35] hover:bg-[#C21025] text-white font-bold py-3 px-5 rounded-xl transition group text-sm">
+                  <span>MakeMyTrip</span><ExternalLink size={16} className="opacity-70 group-hover:opacity-100" />
                 </a>
               )}
               {property.links?.goibibo && (
-                <a
-                  href={property.links.goibibo}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full flex justify-between items-center bg-[#2274E0] hover:bg-[#1959AD] text-white font-bold py-3 px-5 rounded-xl transition group text-sm"
-                >
-                  <span>Goibibo</span>
-                  <ExternalLink size={16} className="opacity-70 group-hover:opacity-100" />
+                <a href={property.links.goibibo} target="_blank" rel="noopener noreferrer"
+                  className="w-full flex justify-between items-center bg-[#2274E0] hover:bg-[#1959AD] text-white font-bold py-3 px-5 rounded-xl transition group text-sm">
+                  <span>Goibibo</span><ExternalLink size={16} className="opacity-70 group-hover:opacity-100" />
                 </a>
               )}
             </div>
