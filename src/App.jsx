@@ -6,6 +6,7 @@ import ScrollToTop from './components/ScrollToTop';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import WhatsAppButton from './components/WhatsAppButton';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Pages
 import Home from './pages/Home';
@@ -35,6 +36,7 @@ function App() {
           <Navbar />
 
           <main className="flex-grow">
+            <ErrorBoundary>
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<Home />} />
@@ -76,6 +78,7 @@ function App() {
 
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </ErrorBoundary>
           </main>
 
           <Footer />
