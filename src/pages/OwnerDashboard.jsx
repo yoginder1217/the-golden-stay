@@ -9,6 +9,7 @@ import {
   Search, RefreshCw, BarChart2, Users,
   Globe, ToggleLeft, ToggleRight, Mail,
   ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X,
+  Download, Reply,
 } from 'lucide-react';
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
@@ -220,6 +221,50 @@ const OwnerDashboard = () => {
   const totalRevenue = useMemo(() => bookings.reduce((s, b) => s + (b.total || 0), 0), [bookings]);
   const avgValue = bookings.length ? Math.round(totalRevenue / bookings.length) : 0;
 
+  // Monthly revenue — last 6 months
+  const monthlyRevenue = useMemo(() => {
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(1);
+      d.setMonth(d.getMonth() - i);
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const label = d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+      const revenue = bookings
+        .filter(b => {
+          if (!b.created_at) return false;
+          const bd = new Date(b.created_at);
+          return bd.getFullYear() === year && bd.getMonth() + 1 === month;
+        })
+        .reduce((s, b) => s + (b.total || 0), 0);
+      months.push({ label, revenue });
+    }
+    return months;
+  }, [bookings]);
+  const maxMonthRevenue = Math.max(...monthlyRevenue.map(m => m.revenue), 1);
+
+  // CSV Export
+  const exportCSV = () => {
+    const headers = ['Booking ID','Guest Name','Guest Email','Guest Phone','Property','Location','Check-in','Check-out','Nights','Guests','Total','Status','Payment ID','Booked On'];
+    const rows = bookings.map(b => [
+      b.booking_ref, b.guest_name, b.guest_email, b.guest_phone || '',
+      b.property_title, b.property_location,
+      b.checkin_date, b.checkout_date, b.nights, b.guests,
+      b.total, b.status, b.payment_id || '',
+      new Date(b.created_at).toLocaleDateString('en-IN'),
+    ]);
+    const csv = [headers, ...rows]
+      .map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `golden-stay-bookings-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const revenueByProperty = useMemo(() => {
     const map = {};
     bookings.forEach(b => {
@@ -344,6 +389,33 @@ const OwnerDashboard = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+
+        {/* Monthly Revenue Chart */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+          <h2 className="font-bold text-charcoal mb-5 flex items-center gap-2 text-base">
+            <TrendingUp size={16} className="text-golden" /> Revenue — Last 6 Months
+          </h2>
+          {loading ? (
+            <div className="h-36 flex items-center justify-center text-gray-400 text-sm">Loading…</div>
+          ) : (
+            <div className="flex items-end gap-3 h-36">
+              {monthlyRevenue.map(({ label, revenue }) => (
+                <div key={label} className="flex-1 flex flex-col items-center gap-1.5">
+                  <span className="text-xs font-bold text-golden tabular-nums">
+                    {revenue > 0 ? `₹${revenue >= 1000 ? `${Math.round(revenue / 1000)}k` : revenue}` : ''}
+                  </span>
+                  <div className="w-full flex items-end" style={{ height: '80px' }}>
+                    <div
+                      className="w-full bg-golden rounded-t-lg transition-all duration-700"
+                      style={{ height: `${Math.max(revenue > 0 ? 6 : 2, (revenue / maxMonthRevenue) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-400 font-medium">{label}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -712,7 +784,15 @@ const OwnerDashboard = () => {
                         <p className="font-bold text-charcoal text-sm">{m.name}</p>
                         <p className="text-gray-400 text-xs">{m.email}{m.phone && ` · ${m.phone}`}</p>
                       </div>
-                      <p className="text-gray-400 text-xs whitespace-nowrap">{fmtDate(m.created_at)}</p>
+                      <div className="flex items-center gap-3">
+                        <p className="text-gray-400 text-xs whitespace-nowrap">{fmtDate(m.created_at)}</p>
+                        <a
+                          href={`mailto:${m.email}?subject=Re: Your enquiry at The Golden Stay&body=Hi ${encodeURIComponent(m.name)},%0A%0AThank you for reaching out to The Golden Stay.%0A%0A----%0AYour original message:%0A${encodeURIComponent(m.message)}%0A----`}
+                          className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-golden border border-golden rounded-lg hover:bg-golden hover:text-white transition-colors whitespace-nowrap"
+                        >
+                          <Reply size={12} /> Reply
+                        </a>
+                      </div>
                     </div>
                     <p className="text-gray-600 text-sm leading-relaxed">{m.message}</p>
                   </div>
@@ -726,9 +806,17 @@ const OwnerDashboard = () => {
         {activeTab === 'bookings' && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="p-5 border-b border-gray-100">
-              <h2 className="font-bold text-charcoal mb-4 flex items-center gap-2 text-base">
-                <Users size={16} className="text-golden" /> All Bookings
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-charcoal flex items-center gap-2 text-base">
+                  <Users size={16} className="text-golden" /> All Bookings
+                </h2>
+                <button
+                  onClick={exportCSV}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-golden border border-golden rounded-lg hover:bg-golden hover:text-white transition-colors"
+                >
+                  <Download size={13} /> Download CSV
+                </button>
+              </div>
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />

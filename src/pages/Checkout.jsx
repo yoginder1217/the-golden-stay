@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { MapPin, Calendar, Users, ShieldCheck, AlertCircle, LogIn, Award } from 'lucide-react';
+import { MapPin, Calendar, Users, ShieldCheck, AlertCircle, LogIn, Award, Tag, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContextUtils';
 import { saveBooking, getUserBookings } from '../lib/bookings';
 import { supabase } from '../lib/supabase';
+import { validatePromoCode } from '../lib/promoCodes';
 
 const formatDate = (dateStr) =>
   dateStr
@@ -62,7 +63,30 @@ const Checkout = () => {
 
   const pointsDiscount = usePoints ? maxRedeemable : 0;
   const pointsRedeemed = pointsDiscount; // 100 pts = ₹100
-  const finalTotal = (total || 0) - pointsDiscount;
+
+  // Promo code
+  const [promoInput, setPromoInput] = useState('');
+  const [promoApplied, setPromoApplied] = useState(null); // { discount, label, code }
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState('');
+
+  const handleApplyPromo = async () => {
+    if (!promoInput.trim()) return;
+    setPromoLoading(true);
+    setPromoError('');
+    setPromoApplied(null);
+    try {
+      const result = await validatePromoCode(promoInput, total || 0);
+      setPromoApplied(result);
+    } catch (err) {
+      setPromoError(err.message);
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const promoDiscount = promoApplied?.discount || 0;
+  const finalTotal = (total || 0) - promoDiscount - pointsDiscount;
 
   if (!state?.property) return null;
 
@@ -127,6 +151,8 @@ const Checkout = () => {
           subtotal,
           cleaning_fee: cleaningFee,
           service_fee: serviceFee,
+          promo_code: promoApplied?.code || null,
+          promo_discount: promoDiscount,
           loyalty_discount: pointsDiscount,
           points_redeemed: pointsRedeemed,
           total: finalTotal,
@@ -314,6 +340,51 @@ const Checkout = () => {
               </form>
             </div>
 
+            {/* Promo Code Card */}
+            <div className={`bg-white rounded-2xl shadow-sm border p-5 transition ${promoApplied ? 'border-green-400/50 bg-green-50/30' : 'border-gray-100'}`}>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-golden/10 flex items-center justify-center">
+                  <Tag size={18} className="text-golden" />
+                </div>
+                <div>
+                  <p className="font-bold text-charcoal text-sm">Promo Code</p>
+                  <p className="text-gray-500 text-xs">Have a discount code? Apply it here.</p>
+                </div>
+              </div>
+              {promoApplied ? (
+                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                  <div className="flex items-center gap-2 text-green-700 text-sm font-bold">
+                    <CheckCircle size={16} /> {promoApplied.label} applied
+                  </div>
+                  <button
+                    onClick={() => { setPromoApplied(null); setPromoInput(''); }}
+                    className="text-xs text-gray-400 hover:text-red-500 transition font-bold"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={promoInput}
+                    onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError(''); }}
+                    onKeyDown={e => e.key === 'Enter' && handleApplyPromo()}
+                    placeholder="GOLDEN10"
+                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-golden/40"
+                  />
+                  <button
+                    onClick={handleApplyPromo}
+                    disabled={promoLoading || !promoInput.trim()}
+                    className="px-4 py-2.5 bg-golden hover:bg-golden-dark disabled:opacity-50 text-white font-bold text-sm rounded-xl transition"
+                  >
+                    {promoLoading ? '…' : 'Apply'}
+                  </button>
+                </div>
+              )}
+              {promoError && <p className="text-red-500 text-xs mt-2 flex items-center gap-1"><AlertCircle size={12} />{promoError}</p>}
+            </div>
+
             {/* Loyalty Points Card */}
             {availablePoints >= 100 && (
               <div className={`bg-white rounded-2xl shadow-sm border p-5 transition ${usePoints ? 'border-golden/50 bg-golden/5' : 'border-gray-100'}`}>
@@ -395,6 +466,12 @@ const Checkout = () => {
                 <div className="flex justify-between text-gray-600">
                   <span>Service fee</span><span>₹{serviceFee}</span>
                 </div>
+                {promoDiscount > 0 && (
+                  <div className="flex justify-between text-green-600 font-medium">
+                    <span>Promo ({promoApplied?.code})</span>
+                    <span>- ₹{promoDiscount.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
                 {usePoints && pointsDiscount > 0 && (
                   <div className="flex justify-between text-green-600 font-medium">
                     <span>Points discount ({pointsRedeemed} pts)</span>
