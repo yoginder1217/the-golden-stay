@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../context/AuthContextUtils';
-import { getAllBookings } from '../lib/adminBookings';
+import { getAllBookings, updateBookingStatus } from '../lib/adminBookings';
+import { properties } from '../data/properties';
 import {
   TrendingUp, Calendar, Home, CreditCard,
   Search, RefreshCw, BarChart2, Users,
+  Globe, ToggleLeft, ToggleRight, CheckCircle2,
 } from 'lucide-react';
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
@@ -29,6 +31,13 @@ const OwnerDashboard = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [propertyFilter, setPropertyFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('bookings');
+  const [updatingId, setUpdatingId] = useState(null);
+
+  // Channel manager: per-property platform toggles (UI state only)
+  const [channels, setChannels] = useState(() =>
+    Object.fromEntries(properties.map(p => [p.id, { airbnb: !!p.links?.airbnb, mmt: !!p.links?.mmt, goibibo: !!p.links?.goibibo }]))
+  );
 
   const fetchBookings = useCallback(async () => {
     setLoading(true);
@@ -47,6 +56,24 @@ const OwnerDashboard = () => {
     if (isAdmin) fetchBookings();
     else setLoading(false);
   }, [isAdmin, fetchBookings]);
+
+  const handleStatusChange = async (bookingId, newStatus) => {
+    setUpdatingId(bookingId);
+    try {
+      await updateBookingStatus(bookingId, newStatus);
+      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
+    } catch {
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const toggleChannel = (propertyId, platform) => {
+    setChannels(prev => ({
+      ...prev,
+      [propertyId]: { ...prev[propertyId], [platform]: !prev[propertyId][platform] },
+    }));
+  };
 
   const totalRevenue = useMemo(() => bookings.reduce((s, b) => s + (b.total || 0), 0), [bookings]);
   const avgValue = bookings.length ? Math.round(totalRevenue / bookings.length) : 0;
@@ -167,8 +194,74 @@ const OwnerDashboard = () => {
           )}
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-2 mb-4">
+          {[
+            { id: 'bookings', label: 'All Bookings', icon: Users },
+            { id: 'channels', label: 'Channel Manager', icon: Globe },
+          ].map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all ${
+                activeTab === id
+                  ? 'bg-golden text-white shadow-md'
+                  : 'bg-white text-gray-500 border border-gray-200 hover:border-golden hover:text-golden'
+              }`}
+            >
+              <Icon size={15} /> {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Channel Manager */}
+        {activeTab === 'channels' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <Globe size={16} className="text-golden" />
+              <h2 className="font-bold text-charcoal text-base">Platform Sync Status</h2>
+              <span className="ml-auto text-xs text-gray-400 bg-gray-50 border border-gray-200 px-3 py-1 rounded-full">UI preview — connect OTA API to enable live sync</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {properties.map(p => (
+                <div key={p.id} className="border border-gray-100 rounded-2xl overflow-hidden hover:shadow-md transition">
+                  <div className="relative h-28">
+                    <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/30" />
+                    <div className="absolute bottom-0 left-0 p-3">
+                      <p className="text-white font-bold text-xs leading-tight">{p.title}</p>
+                      <p className="text-white/70 text-xs">{p.city}</p>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {[
+                      { key: 'airbnb', label: 'Airbnb', color: 'text-[#FF5A5F]' },
+                      { key: 'mmt', label: 'MakeMyTrip', color: 'text-[#E41F35]' },
+                      { key: 'goibibo', label: 'Goibibo', color: 'text-[#2274E0]' },
+                    ].map(({ key, label, color }) => (
+                      <div key={key} className="flex items-center justify-between">
+                        <span className={`text-xs font-bold ${color}`}>{label}</span>
+                        <button
+                          onClick={() => toggleChannel(p.id, key)}
+                          className="flex items-center gap-1.5 text-xs transition"
+                        >
+                          {channels[p.id]?.[key] ? (
+                            <><ToggleRight size={22} className="text-green-500" /><span className="text-green-600 font-medium">Active</span></>
+                          ) : (
+                            <><ToggleLeft size={22} className="text-gray-300" /><span className="text-gray-400 font-medium">Off</span></>
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* All Bookings Table */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {activeTab === 'bookings' && <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-gray-100">
             <h2 className="font-bold text-charcoal mb-4 flex items-center gap-2 text-base">
               <Users size={16} className="text-golden" /> All Bookings
@@ -247,9 +340,17 @@ const OwnerDashboard = () => {
                         <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-center">{b.nights}</td>
                         <td className="px-4 py-3 font-bold text-charcoal whitespace-nowrap">{fmt(b.total)}</td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`inline-flex items-center text-xs font-bold px-2.5 py-1 rounded-full border ${STATUS_COLORS[b.status] ?? STATUS_COLORS.confirmed}`}>
-                            {b.status ?? 'confirmed'}
-                          </span>
+                          <select
+                            value={b.status ?? 'confirmed'}
+                            disabled={updatingId === b.id}
+                            onChange={e => handleStatusChange(b.id, e.target.value)}
+                            className={`text-xs font-bold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none disabled:opacity-50 ${STATUS_COLORS[b.status] ?? STATUS_COLORS.confirmed}`}
+                          >
+                            <option value="confirmed">Confirmed</option>
+                            <option value="pending">Pending</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
                         </td>
                         <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtDate(b.created_at)}</td>
                       </tr>
@@ -263,7 +364,7 @@ const OwnerDashboard = () => {
               </div>
             </>
           )}
-        </div>
+        </div>}
 
       </div>
     </div>

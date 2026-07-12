@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
 import { useSearchParams } from 'react-router-dom';
-import { properties } from '../data/properties';
+import { properties, cities } from '../data/properties';
 import PropertyCard from '../components/PropertyCard';
-import { X } from 'lucide-react';
+import { X, MapPin } from 'lucide-react';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -21,6 +21,7 @@ const itemVariants = {
 
 const Properties = () => {
   const [activeFilter, setActiveFilter] = useState('All');
+  const [activeCity, setActiveCity] = useState('All');
   const [searchParams, setSearchParams] = useSearchParams();
 
   const locationQuery = searchParams.get('location') || '';
@@ -29,14 +30,16 @@ const Properties = () => {
 
   const hasSearchQuery = locationQuery || checkinQuery || guestsQuery;
 
-  const clearSearch = () => setSearchParams({});
+  const clearSearch = () => { setSearchParams({}); setActiveCity('All'); };
 
   const filteredProperties = properties.filter(property => {
     const matchesType = activeFilter === 'All' || property.type === activeFilter;
+    const matchesCity = activeCity === 'All' || property.city === activeCity;
     const matchesLocation = !locationQuery ||
       property.location.toLowerCase().includes(locationQuery.toLowerCase()) ||
-      property.title.toLowerCase().includes(locationQuery.toLowerCase());
-    return matchesType && matchesLocation;
+      property.title.toLowerCase().includes(locationQuery.toLowerCase()) ||
+      property.city?.toLowerCase().includes(locationQuery.toLowerCase());
+    return matchesType && matchesCity && matchesLocation;
   });
 
   return (
@@ -78,19 +81,35 @@ const Properties = () => {
           animate={{ opacity: 1, y: 0 }}
           className="bg-white/80 backdrop-blur-md border border-white/20 p-4 rounded-2xl shadow-xl flex flex-col md:flex-row justify-between items-center gap-4"
         >
-          <div className="flex gap-2 overflow-x-auto p-1 w-full md:w-auto scrollbar-hide">
-            {['All', '2BHK', '3BHK', 'Villa'].map((filter) => (
-              <button
-                key={filter}
-                onClick={() => setActiveFilter(filter)}
-                className={`px-6 py-2 rounded-full font-bold transition-all whitespace-nowrap ${activeFilter === filter
-                  ? 'bg-golden text-white shadow-lg transform scale-105'
-                  : 'bg-white text-gray-500 hover:bg-gray-100'
-                  }`}
-              >
-                {filter}
-              </button>
-            ))}
+          <div className="flex flex-col gap-3 w-full md:w-auto">
+            <div className="flex gap-2 overflow-x-auto p-1 scrollbar-hide">
+              {['All', '2BHK', '3BHK', 'Villa'].map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setActiveFilter(filter)}
+                  className={`px-5 py-2 rounded-full font-bold transition-all whitespace-nowrap text-sm ${activeFilter === filter
+                    ? 'bg-golden text-white shadow-lg'
+                    : 'bg-white text-gray-500 hover:bg-gray-100'
+                    }`}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 overflow-x-auto p-1 scrollbar-hide">
+              {['All', ...cities].map((city) => (
+                <button
+                  key={city}
+                  onClick={() => setActiveCity(city)}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full font-medium transition-all whitespace-nowrap text-xs border ${activeCity === city
+                    ? 'bg-charcoal text-white border-charcoal'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-golden hover:text-golden'
+                    }`}
+                >
+                  {city !== 'All' && <MapPin size={10} />} {city === 'All' ? 'All Cities' : city}
+                </button>
+              ))}
+            </div>
           </div>
 
           {hasSearchQuery && (

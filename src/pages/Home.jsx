@@ -216,6 +216,52 @@ const Home = () => {
         </div>
       </div>
 
+      {/* --- EXPLORE BY CITY --- */}
+      <div className="bg-white py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl md:text-5xl font-bold text-charcoal mb-3">Explore by City</h2>
+            <p className="text-gray-500 text-lg">Premium stays across India's finest destinations.</p>
+          </motion.div>
+
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
+          >
+            {[
+              { city: 'Noida', img: 'https://images.unsplash.com/photo-1587474260584-136574528ed5?auto=format&fit=crop&q=80&w=400', count: 1 },
+              { city: 'Delhi', img: 'https://images.unsplash.com/photo-1587474260584-136574528ed5?auto=format&fit=crop&q=80&w=400', count: 1 },
+              { city: 'Gurugram', img: 'https://images.unsplash.com/photo-1560185007-cde436f6a4d0?auto=format&fit=crop&q=80&w=400', count: 1 },
+              { city: 'Mumbai', img: 'https://images.unsplash.com/photo-1566552881560-0be862a7c445?auto=format&fit=crop&q=80&w=400', count: 1 },
+              { city: 'Jaipur', img: 'https://images.unsplash.com/photo-1477587458883-47145ed31f1a?auto=format&fit=crop&q=80&w=400', count: 1 },
+              { city: 'Goa', img: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&q=80&w=400', count: 1 },
+            ].map(({ city, img, count }) => (
+              <motion.div key={city} variants={fadeInUp}>
+                <Link
+                  to={`/properties?location=${city}`}
+                  className="group block relative h-36 md:h-44 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300"
+                >
+                  <img src={img} alt={city} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-3">
+                    <p className="text-white font-bold text-sm">{city}</p>
+                    <p className="text-white/70 text-xs">{count} property</p>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </div>
+
       {/* --- TESTIMONIALS --- */}
       <Testimonials />
 

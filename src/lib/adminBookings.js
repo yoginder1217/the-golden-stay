@@ -8,3 +8,14 @@ export const getAllBookings = async () => {
   if (error) throw error;
   return data ?? [];
 };
+
+export const updateBookingStatus = async (bookingId, status) => {
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({ status })
+    .eq('id', bookingId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
