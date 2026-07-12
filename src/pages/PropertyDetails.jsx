@@ -8,6 +8,7 @@ import WishlistButton from '../components/WishlistButton';
 import { StarPicker, StarDisplay } from '../components/StarRating';
 import { getPropertyReviews, submitReview } from '../lib/reviews';
 import { useAuth } from '../context/AuthContextUtils';
+import { getPropertyAvailability, hasDateConflict } from '../lib/availability';
 
 const CLEANING_FEE = 500;
 const SERVICE_FEE = 300;
@@ -29,6 +30,16 @@ const PropertyDetails = () => {
   const [checkout, setCheckout] = useState('');
   const [guests, setGuests] = useState('2');
   const [dateError, setDateError] = useState('');
+
+  // Availability
+  const [availability, setAvailability] = useState([]);
+  useEffect(() => {
+    if (property?.id) {
+      getPropertyAvailability(property.id)
+        .then(setAvailability)
+        .catch(() => {});
+    }
+  }, [property?.id]);
 
   // Reviews state
   const [reviews, setReviews] = useState([]);
@@ -77,6 +88,10 @@ const PropertyDetails = () => {
   const handleBookDirect = () => {
     if (!checkin || !checkout) {
       setDateError('Please select your check-in and check-out dates to continue.');
+      return;
+    }
+    if (hasDateConflict(availability, checkin, checkout)) {
+      setDateError('Sorry, this property is already booked for those dates. Please choose different dates.');
       return;
     }
     navigate('/checkout', {
@@ -209,6 +224,25 @@ const PropertyDetails = () => {
                 <span className="font-medium">{item}</span>
               </div>
             ))}
+          </div>
+
+          {/* Location Map */}
+          <div className="border-t border-gray-100 pt-10 mb-10">
+            <h2 className="text-2xl font-bold mb-5 font-serif flex items-center gap-2">
+              <MapPin size={22} className="text-golden" /> Location
+            </h2>
+            <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+              <iframe
+                title="Property Location Map"
+                src={`https://maps.google.com/maps?q=${encodeURIComponent(property.location + ', India')}&output=embed&z=14`}
+                className="w-full h-72 border-0"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+            <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+              <MapPin size={11} /> {property.location} — exact address shared after booking confirmation
+            </p>
           </div>
 
           {/* Reviews Section */}

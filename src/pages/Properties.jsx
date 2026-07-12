@@ -32,6 +32,9 @@ const Properties = () => {
 
   const clearSearch = () => { setSearchParams({}); setActiveCity('All'); };
 
+  const CAPACITY = { '2BHK': 6, '3BHK': 8, 'Villa': 12 };
+  const guestCount = parseInt(guestsQuery, 10) || 0;
+
   const filteredProperties = properties.filter(property => {
     const matchesType = activeFilter === 'All' || property.type === activeFilter;
     const matchesCity = activeCity === 'All' || property.city === activeCity;
@@ -39,7 +42,8 @@ const Properties = () => {
       property.location.toLowerCase().includes(locationQuery.toLowerCase()) ||
       property.title.toLowerCase().includes(locationQuery.toLowerCase()) ||
       property.city?.toLowerCase().includes(locationQuery.toLowerCase());
-    return matchesType && matchesCity && matchesLocation;
+    const matchesGuests = !guestCount || (CAPACITY[property.type] || 6) >= guestCount;
+    return matchesType && matchesCity && matchesLocation && matchesGuests;
   });
 
   return (

@@ -24,3 +24,13 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Environment variables — never commit these
+.env
+.env.*
+
+# Google OAuth / service account credentials
+*.json
+!package.json
+!package-lock.json
+!tsconfig*.json

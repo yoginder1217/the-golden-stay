@@ -19,3 +19,25 @@ export const getUserBookings = async (userId) => {
   if (error) throw error;
   return data ?? [];
 };
+
+export const updateBookingDates = async (bookingId, { checkin_date, checkout_date, nights, subtotal, total }) => {
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({ checkin_date, checkout_date, nights, subtotal, total })
+    .eq('id', bookingId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
+
+export const cancelBooking = async (bookingId) => {
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({ status: 'cancelled' })
+    .eq('id', bookingId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};

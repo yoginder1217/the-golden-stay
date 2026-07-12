@@ -2,14 +2,17 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../context/AuthContextUtils';
 import { getAllBookings, updateBookingStatus } from '../lib/adminBookings';
+import { getContactMessages } from '../lib/contact';
 import { properties } from '../data/properties';
 import {
   TrendingUp, Calendar, Home, CreditCard,
   Search, RefreshCw, BarChart2, Users,
-  Globe, ToggleLeft, ToggleRight, CheckCircle2,
+  Globe, ToggleLeft, ToggleRight, Mail,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
+const PAGE_SIZE = 10;
 
 const fmt = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -33,6 +36,12 @@ const OwnerDashboard = () => {
   const [propertyFilter, setPropertyFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('bookings');
   const [updatingId, setUpdatingId] = useState(null);
+  const [page, setPage] = useState(1);
+
+  // Messages tab
+  const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState('');
 
   // Channel manager: per-property platform toggles (UI state only)
   const [channels, setChannels] = useState(() =>
@@ -52,10 +61,30 @@ const OwnerDashboard = () => {
     }
   }, []);
 
+  const fetchMessages = useCallback(async () => {
+    setMessagesLoading(true);
+    setMessagesError('');
+    try {
+      const data = await getContactMessages();
+      setMessages(data);
+    } catch (err) {
+      setMessagesError(err?.message || 'Failed to load messages.');
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isAdmin) fetchBookings();
     else setLoading(false);
   }, [isAdmin, fetchBookings]);
+
+  useEffect(() => {
+    if (isAdmin && activeTab === 'messages') fetchMessages();
+  }, [isAdmin, activeTab, fetchMessages]);
+
+  // Reset page when filters change
+  useEffect(() => { setPage(1); }, [search, statusFilter, propertyFilter]);
 
   const handleStatusChange = async (bookingId, newStatus) => {
     setUpdatingId(bookingId);
@@ -101,6 +130,8 @@ const OwnerDashboard = () => {
   }), [bookings, search, statusFilter, propertyFilter]);
 
   const filteredRevenue = useMemo(() => filtered.reduce((s, b) => s + (b.total || 0), 0), [filtered]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   if (!isAdmin) {
     return (
@@ -119,8 +150,14 @@ const OwnerDashboard = () => {
   const stats = [
     { label: 'Total Revenue', value: fmt(totalRevenue), icon: TrendingUp, color: 'text-green-600 bg-green-50' },
     { label: 'Total Bookings', value: bookings.length, icon: Calendar, color: 'text-blue-600 bg-blue-50' },
-    { label: 'Properties', value: 3, icon: Home, color: 'text-purple-600 bg-purple-50' },
+    { label: 'Properties', value: properties.length, icon: Home, color: 'text-purple-600 bg-purple-50' },
     { label: 'Avg Booking Value', value: fmt(avgValue), icon: CreditCard, color: 'text-golden bg-golden/10' },
+  ];
+
+  const tabs = [
+    { id: 'bookings', label: 'All Bookings', icon: Users },
+    { id: 'messages', label: `Messages${messages.length ? ` (${messages.length})` : ''}`, icon: Mail },
+    { id: 'channels', label: 'Channel Manager', icon: Globe },
   ];
 
   return (
@@ -195,11 +232,8 @@ const OwnerDashboard = () => {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-4">
-          {[
-            { id: 'bookings', label: 'All Bookings', icon: Users },
-            { id: 'channels', label: 'Channel Manager', icon: Globe },
-          ].map(({ id, label, icon: Icon }) => (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {tabs.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -260,111 +294,172 @@ const OwnerDashboard = () => {
           </div>
         )}
 
-        {/* All Bookings Table */}
-        {activeTab === 'bookings' && <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-gray-100">
-            <h2 className="font-bold text-charcoal mb-4 flex items-center gap-2 text-base">
-              <Users size={16} className="text-golden" /> All Bookings
-            </h2>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search guest name, email or booking ID…"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-golden/40"
-                />
-              </div>
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-golden/40 bg-white"
-              >
-                <option value="all">All Statuses</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="pending">Pending</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="completed">Completed</option>
-              </select>
-              <select
-                value={propertyFilter}
-                onChange={e => setPropertyFilter(e.target.value)}
-                className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-golden/40 bg-white"
-              >
-                <option value="all">All Properties</option>
-                {propertyList.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="p-14 flex items-center justify-center">
-              <svg className="animate-spin h-7 w-7 text-golden" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-              </svg>
-            </div>
-          ) : error ? (
-            <div className="p-10 text-center">
-              <p className="text-red-500 text-sm mb-3">{error}</p>
-              <button onClick={fetchBookings} className="text-golden font-bold text-sm hover:underline flex items-center gap-1 mx-auto">
-                <RefreshCw size={14} /> Retry
+        {/* Contact Messages */}
+        {activeTab === 'messages' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-bold text-charcoal flex items-center gap-2 text-base">
+                <Mail size={16} className="text-golden" /> Contact Messages
+              </h2>
+              <button onClick={fetchMessages} className="text-golden text-sm font-bold flex items-center gap-1 hover:underline">
+                <RefreshCw size={13} /> Refresh
               </button>
             </div>
-          ) : filtered.length === 0 ? (
-            <div className="p-14 text-center text-gray-400 text-sm">No bookings match your filters.</div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 text-left">
-                      {['Booking ID', 'Guest', 'Property', 'Check-in', 'Check-out', 'Nights', 'Total', 'Status', 'Booked On'].map(h => (
-                        <th key={h} className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {filtered.map(b => (
-                      <tr key={b.id} className="hover:bg-gray-50/50 transition">
-                        <td className="px-4 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">{b.booking_ref}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <p className="font-semibold text-charcoal">{b.guest_name}</p>
-                          <p className="text-gray-400 text-xs">{b.guest_email}</p>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap max-w-[160px] truncate">{b.property_title}</td>
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(b.checkin_date)}</td>
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(b.checkout_date)}</td>
-                        <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-center">{b.nights}</td>
-                        <td className="px-4 py-3 font-bold text-charcoal whitespace-nowrap">{fmt(b.total)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <select
-                            value={b.status ?? 'confirmed'}
-                            disabled={updatingId === b.id}
-                            onChange={e => handleStatusChange(b.id, e.target.value)}
-                            className={`text-xs font-bold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none disabled:opacity-50 ${STATUS_COLORS[b.status] ?? STATUS_COLORS.confirmed}`}
-                          >
-                            <option value="confirmed">Confirmed</option>
-                            <option value="pending">Pending</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        </td>
-                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtDate(b.created_at)}</td>
+            {messagesLoading ? (
+              <div className="p-14 flex items-center justify-center">
+                <svg className="animate-spin h-7 w-7 text-golden" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+              </div>
+            ) : messagesError ? (
+              <div className="p-10 text-center text-red-500 text-sm">{messagesError}</div>
+            ) : messages.length === 0 ? (
+              <div className="p-14 text-center text-gray-400 text-sm">No messages yet.</div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {messages.map(m => (
+                  <div key={m.id} className="p-5 hover:bg-gray-50/50 transition">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-2">
+                      <div>
+                        <p className="font-bold text-charcoal text-sm">{m.name}</p>
+                        <p className="text-gray-400 text-xs">{m.email}{m.phone && ` · ${m.phone}`}</p>
+                      </div>
+                      <p className="text-gray-400 text-xs whitespace-nowrap">{fmtDate(m.created_at)}</p>
+                    </div>
+                    <p className="text-gray-600 text-sm leading-relaxed">{m.message}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* All Bookings Table */}
+        {activeTab === 'bookings' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-gray-100">
+              <h2 className="font-bold text-charcoal mb-4 flex items-center gap-2 text-base">
+                <Users size={16} className="text-golden" /> All Bookings
+              </h2>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search guest name, email or booking ID…"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-golden/40"
+                  />
+                </div>
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value)}
+                  className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-golden/40 bg-white"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="pending">Pending</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="completed">Completed</option>
+                </select>
+                <select
+                  value={propertyFilter}
+                  onChange={e => setPropertyFilter(e.target.value)}
+                  className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-golden/40 bg-white"
+                >
+                  <option value="all">All Properties</option>
+                  {propertyList.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="p-14 flex items-center justify-center">
+                <svg className="animate-spin h-7 w-7 text-golden" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+              </div>
+            ) : error ? (
+              <div className="p-10 text-center">
+                <p className="text-red-500 text-sm mb-3">{error}</p>
+                <button onClick={fetchBookings} className="text-golden font-bold text-sm hover:underline flex items-center gap-1 mx-auto">
+                  <RefreshCw size={14} /> Retry
+                </button>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="p-14 text-center text-gray-400 text-sm">No bookings match your filters.</div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left">
+                        {['Booking ID', 'Guest', 'Property', 'Check-in', 'Check-out', 'Nights', 'Total', 'Status', 'Booked On'].map(h => (
+                          <th key={h} className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="px-5 py-3 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 text-xs text-gray-400">
-                <span>Showing {filtered.length} of {bookings.length} bookings</span>
-                <span className="font-bold text-charcoal">Filtered total: {fmt(filteredRevenue)}</span>
-              </div>
-            </>
-          )}
-        </div>}
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {paginated.map(b => (
+                        <tr key={b.id} className="hover:bg-gray-50/50 transition">
+                          <td className="px-4 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">{b.booking_ref}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <p className="font-semibold text-charcoal">{b.guest_name}</p>
+                            <p className="text-gray-400 text-xs">{b.guest_email}</p>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap max-w-[160px] truncate">{b.property_title}</td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(b.checkin_date)}</td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(b.checkout_date)}</td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-center">{b.nights}</td>
+                          <td className="px-4 py-3 font-bold text-charcoal whitespace-nowrap">{fmt(b.total)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <select
+                              value={b.status ?? 'confirmed'}
+                              disabled={updatingId === b.id}
+                              onChange={e => handleStatusChange(b.id, e.target.value)}
+                              className={`text-xs font-bold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none disabled:opacity-50 ${STATUS_COLORS[b.status] ?? STATUS_COLORS.confirmed}`}
+                            >
+                              <option value="confirmed">Confirmed</option>
+                              <option value="pending">Pending</option>
+                              <option value="completed">Completed</option>
+                              <option value="cancelled">Cancelled</option>
+                            </select>
+                          </td>
+                          <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtDate(b.created_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="px-5 py-3 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs text-gray-400">
+                  <span>Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} bookings · <span className="font-bold text-charcoal">Filtered total: {fmt(filteredRevenue)}</span></span>
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="p-1.5 rounded-lg border border-gray-200 hover:border-golden hover:text-golden transition disabled:opacity-30"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <span className="font-bold text-charcoal">{page} / {totalPages}</span>
+                      <button
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        className="p-1.5 rounded-lg border border-gray-200 hover:border-golden hover:text-golden transition disabled:opacity-30"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
       </div>
     </div>

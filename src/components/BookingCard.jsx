@@ -1,6 +1,14 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Users, Hash, CreditCard, CheckCircle, Clock, XCircle } from 'lucide-react';
+import {
+  MapPin, Calendar, Users, Hash, CreditCard,
+  CheckCircle, Clock, XCircle, AlertTriangle,
+  Printer, Pencil, X, Check,
+} from 'lucide-react';
+import { useReactToPrint } from 'react-to-print';
+import BookingInvoice from './BookingInvoice';
+import { updateBookingDates } from '../lib/bookings';
+import { getPropertyAvailability, hasDateConflict } from '../lib/availability';
 
 const formatDate = (dateStr) =>
   new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -12,10 +20,11 @@ const STATUS_CONFIG = {
   completed: { label: 'Completed', icon: CheckCircle,  color: 'text-gray-500 bg-gray-50 border-gray-200' },
 };
 
-const BookingCard = ({ booking }) => {
+const BookingCard = ({ booking, onCancel, onUpdateDates }) => {
   const {
     property_title, property_location, property_image, property_id,
-    checkin_date, checkout_date, guests, nights, total,
+    checkin_date, checkout_date, guests, nights, total, subtotal,
+    cleaning_fee, service_fee, loyalty_discount,
     booking_ref, payment_id, status,
   } = booking;
 
@@ -25,24 +34,96 @@ const BookingCard = ({ booking }) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const checkinDate = new Date(checkin_date);
-  const checkoutDate = new Date(checkout_date);
   const isUpcoming = checkinDate >= today;
-  const daysUntil = isUpcoming
-    ? Math.ceil((checkinDate - today) / (1000 * 60 * 60 * 24))
-    : null;
+  const daysUntil = isUpcoming ? Math.ceil((checkinDate - today) / (1000 * 60 * 60 * 24)) : null;
+  const canCancel = isUpcoming && status !== 'cancelled' && status !== 'completed';
+  const canEdit = isUpcoming && status !== 'cancelled' && status !== 'completed';
+
+  // Cancel state
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState('');
+
+  const handleConfirmCancel = async () => {
+    if (!onCancel) return;
+    setCancelling(true);
+    setCancelError('');
+    try {
+      await onCancel(booking.id);
+    } catch {
+      setCancelError('Could not cancel. Please try again.');
+      setCancelling(false);
+      setConfirmCancel(false);
+    }
+  };
+
+  // Date edit state
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [showEdit, setShowEdit] = useState(false);
+  const [newCheckin, setNewCheckin] = useState(checkin_date);
+  const [newCheckout, setNewCheckout] = useState(checkout_date);
+  const [editError, setEditError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const pricePerNight = subtotal && nights ? Math.round(subtotal / nights) : Math.round((total - (cleaning_fee || 500) - (service_fee || 300) + (loyalty_discount || 0)) / nights);
+  const newNights = newCheckin && newCheckout
+    ? Math.max(1, Math.ceil((new Date(newCheckout) - new Date(newCheckin)) / 86400000))
+    : 0;
+  const newSubtotal = pricePerNight * newNights;
+  const newTotal = newSubtotal + (cleaning_fee || 500) + (service_fee || 300) - (loyalty_discount || 0);
+
+  const minNewCheckout = newCheckin
+    ? new Date(new Date(newCheckin).getTime() + 86400000).toISOString().split('T')[0]
+    : todayStr;
+
+  const handleSaveDates = async () => {
+    if (!newCheckin || !newCheckout) { setEditError('Please select both dates.'); return; }
+    if (newCheckin === checkin_date && newCheckout === checkout_date) { setShowEdit(false); return; }
+    setSaving(true);
+    setEditError('');
+    try {
+      // Check availability, excluding the current booking's own date range
+      const allAvailability = await getPropertyAvailability(property_id);
+      const otherBookings = allAvailability.filter(
+        r => !(r.checkin_date === checkin_date && r.checkout_date === checkout_date)
+      );
+      if (hasDateConflict(otherBookings, newCheckin, newCheckout)) {
+        setEditError('Those dates are already booked. Please choose different dates.');
+        setSaving(false);
+        return;
+      }
+      const updated = await updateBookingDates(booking.id, {
+        checkin_date: newCheckin,
+        checkout_date: newCheckout,
+        nights: newNights,
+        subtotal: newSubtotal,
+        total: newTotal,
+      });
+      if (onUpdateDates) onUpdateDates(updated);
+      setShowEdit(false);
+    } catch (err) {
+      setEditError(err?.message || 'Could not update dates. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Print invoice
+  const invoiceRef = useRef(null);
+  const handlePrint = useReactToPrint({ contentRef: invoiceRef });
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition">
-      <div className="flex flex-col sm:flex-row">
+      {/* Hidden invoice for printing */}
+      <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+        <BookingInvoice ref={invoiceRef} booking={booking} />
+      </div>
 
+      <div className="flex flex-col sm:flex-row">
         {/* Property Image */}
         <div className="sm:w-48 h-40 sm:h-auto shrink-0 relative">
-          <img
-            src={property_image}
-            alt={property_title}
-            className="w-full h-full object-cover"
-          />
-          {isUpcoming && daysUntil <= 7 && (
+          <img src={property_image} alt={property_title} className="w-full h-full object-cover" />
+          {isUpcoming && daysUntil !== null && daysUntil <= 7 && (
             <div className="absolute top-2 left-2 bg-golden text-white text-xs font-bold px-2 py-1 rounded-full">
               {daysUntil === 0 ? 'Today!' : `${daysUntil}d away`}
             </div>
@@ -82,6 +163,64 @@ const BookingCard = ({ booking }) => {
             </div>
           </div>
 
+          {/* Change Dates Panel */}
+          {showEdit && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+              <p className="text-xs font-bold text-charcoal mb-3">Change Your Dates</p>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">New Check-in</label>
+                  <input
+                    type="date" min={todayStr} value={newCheckin}
+                    onChange={e => { setNewCheckin(e.target.value); setNewCheckout(''); setEditError(''); }}
+                    className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-golden/40 [color-scheme:light]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">New Check-out</label>
+                  <input
+                    type="date" min={minNewCheckout} value={newCheckout} disabled={!newCheckin}
+                    onChange={e => { setNewCheckout(e.target.value); setEditError(''); }}
+                    className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-golden/40 [color-scheme:light] disabled:text-gray-300"
+                  />
+                </div>
+              </div>
+              {newNights > 0 && (
+                <p className="text-xs text-gray-600 mb-3">
+                  {newNights} {newNights === 1 ? 'night' : 'nights'} — New total:{' '}
+                  <strong className="text-charcoal">₹{newTotal.toLocaleString('en-IN')}</strong>
+                  {newTotal !== total && (
+                    <span className={`ml-1 ${newTotal > total ? 'text-red-500' : 'text-green-600'}`}>
+                      ({newTotal > total ? '+' : ''}₹{(newTotal - total).toLocaleString('en-IN')})
+                    </span>
+                  )}
+                </p>
+              )}
+              {editError && <p className="text-red-500 text-xs mb-2">{editError}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSaveDates}
+                  disabled={saving || !newCheckin || !newCheckout}
+                  className="flex items-center gap-1.5 text-xs font-bold bg-golden hover:bg-golden-dark text-white px-4 py-2 rounded-lg transition disabled:opacity-50"
+                >
+                  {saving ? (
+                    <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                  ) : <Check size={12} />}
+                  {saving ? 'Saving…' : 'Confirm Change'}
+                </button>
+                <button
+                  onClick={() => { setShowEdit(false); setNewCheckin(checkin_date); setNewCheckout(checkout_date); setEditError(''); }}
+                  className="flex items-center gap-1.5 text-xs font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 px-4 py-2 rounded-lg transition"
+                >
+                  <X size={12} /> Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-wrap justify-between items-center gap-2">
             <div className="text-xs text-gray-400 space-y-0.5">
               <p className="flex items-center gap-1"><Hash size={11} /> {booking_ref}</p>
@@ -89,13 +228,60 @@ const BookingCard = ({ booking }) => {
                 <p className="flex items-center gap-1"><CreditCard size={11} /> {payment_id}</p>
               )}
             </div>
-            <Link
-              to={`/property/${property_id}`}
-              className="text-xs font-bold text-golden hover:text-golden-dark hover:underline transition"
-            >
-              View Property →
-            </Link>
+            <div className="flex items-center gap-3 flex-wrap">
+              {canEdit && !showEdit && (
+                <button
+                  onClick={() => setShowEdit(true)}
+                  className="text-xs font-bold text-blue-500 hover:text-blue-700 flex items-center gap-1 transition"
+                >
+                  <Pencil size={12} /> Change Dates
+                </button>
+              )}
+              {canCancel && (
+                <div className="flex items-center gap-2">
+                  {confirmCancel ? (
+                    <>
+                      <span className="text-xs text-gray-500 hidden sm:inline">Cancel this booking?</span>
+                      <button
+                        onClick={handleConfirmCancel}
+                        disabled={cancelling}
+                        className="text-xs font-bold text-red-600 border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-full transition disabled:opacity-50"
+                      >
+                        {cancelling ? 'Cancelling…' : 'Yes, Cancel'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmCancel(false)}
+                        className="text-xs font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 px-3 py-1.5 rounded-full transition"
+                      >
+                        No
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmCancel(true)}
+                      className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center gap-1 transition"
+                    >
+                      <AlertTriangle size={12} /> Cancel
+                    </button>
+                  )}
+                </div>
+              )}
+              <button
+                onClick={handlePrint}
+                className="text-xs font-bold text-gray-400 hover:text-charcoal flex items-center gap-1 transition"
+              >
+                <Printer size={12} /> Invoice
+              </button>
+              <Link
+                to={`/property/${property_id}`}
+                className="text-xs font-bold text-golden hover:text-golden-dark hover:underline transition"
+              >
+                View Property →
+              </Link>
+            </div>
           </div>
+
+          {cancelError && <p className="text-red-500 text-xs mt-2">{cancelError}</p>}
         </div>
       </div>
     </div>

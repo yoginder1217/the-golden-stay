@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContextUtils';
-import { getUserBookings } from '../lib/bookings';
+import { getUserBookings, cancelBooking } from '../lib/bookings';
 import BookingCard from '../components/BookingCard';
 import { Helmet } from 'react-helmet-async';
-import { Home, Calendar, User, LogOut, RefreshCw, Heart, Award } from 'lucide-react';
+import { Home, Calendar, User, LogOut, RefreshCw, Heart, Award, Settings } from 'lucide-react';
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -34,19 +34,42 @@ const Dashboard = () => {
     if (user?.id) fetchBookings();
   }, [user?.id, fetchBookings]);
 
+  const handleCancelBooking = async (bookingId) => {
+    await cancelBooking(bookingId);
+    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' } : b));
+  };
+
+  const handleUpdateDates = (updated) => {
+    setBookings(prev => prev.map(b => b.id === updated.id ? { ...b, ...updated } : b));
+  };
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const upcoming = bookings.filter(b => new Date(b.checkin_date) >= today);
   const past = bookings.filter(b => new Date(b.checkin_date) < today);
 
-  // Loyalty points: ₹100 spent = 1 point
   const totalPoints = useMemo(() =>
-    bookings.reduce((s, b) => s + Math.floor((b.total || 0) / 100), 0),
+    bookings.reduce((s, b) => s + Math.floor((b.total || 0) / 100) - (b.points_redeemed || 0), 0),
   [bookings]);
   const tier = totalPoints >= 150 ? { label: 'Gold', color: 'text-yellow-600 bg-yellow-50 border-yellow-200' }
     : totalPoints >= 50 ? { label: 'Silver', color: 'text-gray-500 bg-gray-50 border-gray-300' }
     : { label: 'Bronze', color: 'text-orange-600 bg-orange-50 border-orange-200' };
+
+  const SkeletonCard = () => (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-pulse">
+      <div className="flex flex-col sm:flex-row">
+        <div className="sm:w-48 h-40 sm:h-auto shrink-0 bg-gray-200" />
+        <div className="flex-1 p-5 space-y-3">
+          <div className="h-4 bg-gray-200 rounded w-2/3" />
+          <div className="h-3 bg-gray-100 rounded w-1/3" />
+          <div className="grid grid-cols-4 gap-3">
+            {[1,2,3,4].map(i => <div key={i} className="h-12 bg-gray-100 rounded-lg" />)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   const BookingsSection = ({ title, items, empty }) => (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6">
@@ -54,7 +77,7 @@ const Dashboard = () => {
         <div className="flex items-center gap-2">
           <Calendar size={18} className="text-golden" />
           <h2 className="font-bold text-charcoal">{title}</h2>
-          {items.length > 0 && (
+          {!loadingBookings && items.length > 0 && (
             <span className="ml-1 bg-golden text-white text-xs font-bold px-2 py-0.5 rounded-full">
               {items.length}
             </span>
@@ -63,11 +86,9 @@ const Dashboard = () => {
       </div>
 
       {loadingBookings ? (
-        <div className="p-10 flex items-center justify-center">
-          <svg className="animate-spin h-7 w-7 text-golden" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-          </svg>
+        <div className="p-4 space-y-4">
+          <SkeletonCard />
+          <SkeletonCard />
         </div>
       ) : fetchError ? (
         <div className="p-10 text-center">
@@ -78,7 +99,7 @@ const Dashboard = () => {
         </div>
       ) : items.length > 0 ? (
         <div className="p-4 space-y-4">
-          {items.map(b => <BookingCard key={b.id} booking={b} />)}
+          {items.map(b => <BookingCard key={b.id} booking={b} onCancel={handleCancelBooking} onUpdateDates={handleUpdateDates} />)}
         </div>
       ) : (
         <div className="p-12 text-center">
@@ -138,9 +159,17 @@ const Dashboard = () => {
 
         {/* Account Info */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
-          <h2 className="text-base font-bold text-charcoal mb-4 flex items-center gap-2">
-            <User size={16} className="text-golden" /> Account Details
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-bold text-charcoal flex items-center gap-2">
+              <User size={16} className="text-golden" /> Account Details
+            </h2>
+            <Link
+              to="/profile"
+              className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-golden border border-gray-200 hover:border-golden px-3 py-1.5 rounded-full transition"
+            >
+              <Settings size={12} /> Edit Profile
+            </Link>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             {[
               { label: 'Full Name', value: displayName },

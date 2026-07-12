@@ -24,6 +24,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
 import OwnerDashboard from './pages/OwnerDashboard';
 import Wishlist from './pages/Wishlist';
+import Profile from './pages/Profile';
 
 function App() {
   return (
@@ -65,6 +66,11 @@ function App() {
               <Route path="/wishlist" element={
                 <ProtectedRoute>
                   <Wishlist />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <Profile />
                 </ProtectedRoute>
               } />
 
