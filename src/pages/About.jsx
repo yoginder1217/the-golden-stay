@@ -14,8 +14,18 @@ const About = () => {
   return (
     <div className="bg-gray-50 overflow-hidden">
       <Helmet>
-        <title>The Golden Stay | Luxury 3BHK Apartments & Homestays</title>
-        <meta name="description" content="Book premium 2BHK and 3BHK family suites. Experience hotel luxury with the comfort of home. Revenue management services for property owners." />
+        <title>About Us | The Golden Stay</title>
+        <meta name="description" content="Learn about The Golden Stay — India's premium family homestay brand offering luxury 2BHK, 3BHK & Villa stays with hotel-grade service." />
+        <link rel="canonical" href="https://the-golden-stay.vercel.app/about" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://the-golden-stay.vercel.app/about" />
+        <meta property="og:title" content="About Us | The Golden Stay" />
+        <meta property="og:description" content="India's premium family homestay brand. Hotel luxury with the comfort of home." />
+        <meta property="og:image" content="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&q=80&w=1200" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="About Us | The Golden Stay" />
+        <meta name="twitter:description" content="India's premium family homestay brand. Hotel luxury with the comfort of home." />
+        <meta name="twitter:image" content="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&q=80&w=1200" />
       </Helmet>
       {/* --- Royal Hero Section (Parallax) --- */}
       <div className="relative h-[60vh] flex items-center justify-center bg-fixed bg-cover bg-center"

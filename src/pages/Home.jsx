@@ -41,8 +41,18 @@ const Home = () => {
   return (
     <div className="overflow-hidden bg-white">
       <Helmet>
-        <title>The Golden Stay | Luxury Family Suites</title>
-        <meta name="description" content="Book premium 2BHK & 3BHK flats for families. Revenue management and franchise opportunities available." />
+        <title>The Golden Stay | Luxury Family Suites & Homestays in India</title>
+        <meta name="description" content="Book premium 2BHK, 3BHK & Villa stays across Noida, Delhi, Gurugram, Mumbai, Goa, Jaipur and more. Hotel luxury with the comfort of home." />
+        <link rel="canonical" href="https://the-golden-stay.vercel.app/" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://the-golden-stay.vercel.app/" />
+        <meta property="og:title" content="The Golden Stay | Luxury Family Suites & Homestays in India" />
+        <meta property="og:description" content="Book premium 2BHK, 3BHK & Villa stays across India. Hotel luxury with the comfort of home." />
+        <meta property="og:image" content="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&q=80&w=1200" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="The Golden Stay | Luxury Family Suites & Homestays in India" />
+        <meta name="twitter:description" content="Book premium 2BHK, 3BHK & Villa stays across India. Hotel luxury with the comfort of home." />
+        <meta name="twitter:image" content="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&q=80&w=1200" />
       </Helmet>
       
       {/* --- HERO SECTION --- */}

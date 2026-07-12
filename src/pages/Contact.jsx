@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Facebook, Instagram, Twitter, Send, CheckCircle, AlertCircle } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 import { saveContactMessage } from '../lib/contact';
 
 const Contact = () => {
@@ -23,6 +24,20 @@ const Contact = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-20 px-4">
+      <Helmet>
+        <title>Contact Us | The Golden Stay</title>
+        <meta name="description" content="Get in touch with The Golden Stay. Book a property, ask about franchise opportunities, or simply say hello." />
+        <link rel="canonical" href="https://the-golden-stay.vercel.app/contact" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://the-golden-stay.vercel.app/contact" />
+        <meta property="og:title" content="Contact Us | The Golden Stay" />
+        <meta property="og:description" content="Get in touch with The Golden Stay for bookings, franchise enquiries, or support." />
+        <meta property="og:image" content="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&q=80&w=1200" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Contact Us | The Golden Stay" />
+        <meta name="twitter:description" content="Get in touch with The Golden Stay for bookings, franchise enquiries, or support." />
+        <meta name="twitter:image" content="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&q=80&w=1200" />
+      </Helmet>
       <div className="max-w-7xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2">
 
         {/* --- Left Side: Info --- */}

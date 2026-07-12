@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /checkout
+Disallow: /booking-success
+Disallow: /dashboard
+Disallow: /owner-dashboard
+
+Sitemap: https://the-golden-stay.vercel.app/sitemap.xml

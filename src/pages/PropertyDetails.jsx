@@ -179,6 +179,16 @@ const PropertyDetails = () => {
       <Helmet>
         <title>{property.title} | The Golden Stay</title>
         <meta name="description" content={property.description} />
+        <link rel="canonical" href={`https://the-golden-stay.vercel.app/property/${property.id}`} />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={`https://the-golden-stay.vercel.app/property/${property.id}`} />
+        <meta property="og:title" content={`${property.title} | The Golden Stay`} />
+        <meta property="og:description" content={property.description} />
+        <meta property="og:image" content={property.image} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${property.title} | The Golden Stay`} />
+        <meta name="twitter:description" content={property.description} />
+        <meta name="twitter:image" content={property.image} />
       </Helmet>
 
       {/* Image Gallery */}

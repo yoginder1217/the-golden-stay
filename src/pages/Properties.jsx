@@ -63,8 +63,18 @@ const Properties = () => {
   return (
     <div className="bg-gray-50 min-h-screen pb-20 overflow-x-hidden">
       <Helmet>
-        <title>The Golden Stay | Luxury 3BHK Apartments & Homestays</title>
-        <meta name="description" content="Book premium 2BHK and 3BHK family suites. Experience hotel luxury with the comfort of home. Revenue management services for property owners." />
+        <title>All Properties | The Golden Stay</title>
+        <meta name="description" content="Browse premium 2BHK, 3BHK & Villa stays across Noida, Delhi, Gurugram, Mumbai, Goa, Jaipur and Chandigarh. Filter by city and capacity." />
+        <link rel="canonical" href="https://the-golden-stay.vercel.app/properties" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://the-golden-stay.vercel.app/properties" />
+        <meta property="og:title" content="All Properties | The Golden Stay" />
+        <meta property="og:description" content="Browse premium family suites across 7 Indian cities. Filter by city, type and capacity." />
+        <meta property="og:image" content="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=1200" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="All Properties | The Golden Stay" />
+        <meta name="twitter:description" content="Browse premium family suites across 7 Indian cities." />
+        <meta name="twitter:image" content="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=1200" />
       </Helmet>
 
       {/* --- Page Header with Parallax --- */}
