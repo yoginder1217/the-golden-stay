@@ -40,8 +40,8 @@ const Navbar = () => {
 
           {/* --- DESKTOP USER ACTIONS --- */}
           <div className="hidden md:flex items-center gap-3">
-            <Link to="/properties" className="bg-golden text-white px-5 py-2 rounded-full font-bold hover:bg-golden-dark transition shadow-md text-sm">
-              Browse Properties
+            <Link to="/contact" className="bg-golden text-white px-5 py-2 rounded-full font-bold hover:bg-golden-dark transition shadow-md text-sm">
+              Become a Host
             </Link>
 
             {user ? (
@@ -168,8 +168,8 @@ const Navbar = () => {
                   </Link>
                 </>
               )}
-              <Link to="/properties" onClick={closeMenu} className="block w-full text-center border border-golden text-golden px-4 py-3 rounded-xl font-bold hover:bg-golden/5 transition">
-                Browse Properties
+              <Link to="/contact" onClick={closeMenu} className="block w-full text-center border border-golden text-golden px-4 py-3 rounded-xl font-bold hover:bg-golden/5 transition">
+                Become a Host
               </Link>
             </div>
           </div>
