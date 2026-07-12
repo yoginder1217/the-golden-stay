@@ -260,6 +260,22 @@ const Checkout = () => {
                 </div>
 
                 <div className="pt-4">
+                  {/* Cancellation policy summary */}
+                  {checkin && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-5 text-xs text-gray-600 leading-relaxed">
+                      <p className="font-bold text-charcoal mb-1.5">Cancellation Policy</p>
+                      {(() => {
+                        const daysToCheckin = Math.ceil((new Date(checkin) - new Date()) / (1000 * 60 * 60 * 24));
+                        return daysToCheckin >= 7
+                          ? <span><span className="text-green-600 font-bold">Free cancellation</span> until {new Date(new Date(checkin).getTime() - 7 * 86400000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}. Cancel after that for a 50% refund (3–6 days out) or no refund (under 3 days).</span>
+                          : daysToCheckin >= 3
+                            ? <span><span className="text-yellow-600 font-bold">50% refund</span> if cancelled now. No refund within 3 days of check-in.</span>
+                            : <span><span className="text-red-500 font-bold">Non-refundable.</span> Cancellations within 72 hours of check-in are not eligible for a refund.</span>;
+                      })()}
+                      {' '}<Link to="/refund-policy" target="_blank" className="text-golden font-bold hover:underline">Full policy →</Link>
+                    </div>
+                  )}
+
                   {/* Terms & Conditions */}
                   <label className="flex items-start gap-3 cursor-pointer mb-4 select-none">
                     <input

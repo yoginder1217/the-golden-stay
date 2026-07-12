@@ -26,6 +26,7 @@ import Terms from './pages/Terms';
 import OwnerDashboard from './pages/OwnerDashboard';
 import Wishlist from './pages/Wishlist';
 import Profile from './pages/Profile';
+import RefundPolicy from './pages/RefundPolicy';
 
 function App() {
   return (
@@ -49,6 +50,7 @@ function App() {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<Terms />} />
+              <Route path="/refund-policy" element={<RefundPolicy />} />
 
               {/* Semi-protected: accessible but guards itself via useEffect */}
               <Route path="/checkout" element={<Checkout />} />

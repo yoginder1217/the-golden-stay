@@ -30,6 +30,13 @@
   </url>
 
   <url>
+    <loc>https://the-golden-stay.vercel.app/refund-policy</loc>
+    <lastmod>2026-07-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <url>
     <loc>https://the-golden-stay.vercel.app/property/1</loc>
     <lastmod>2026-07-13</lastmod>
     <changefreq>weekly</changefreq>

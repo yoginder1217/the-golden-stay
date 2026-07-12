@@ -39,6 +39,15 @@ const BookingCard = ({ booking, onCancel, onUpdateDates }) => {
   const canCancel = isUpcoming && status !== 'cancelled' && status !== 'completed';
   const canEdit = isUpcoming && status !== 'cancelled' && status !== 'completed';
 
+  // Refund eligibility based on days until check-in
+  const refundInfo = canCancel
+    ? daysUntil >= 7
+      ? { label: 'Full refund', amount: total, color: 'text-green-600' }
+      : daysUntil >= 3
+        ? { label: '50% refund', amount: Math.round(total * 0.5), color: 'text-yellow-600' }
+        : { label: 'No refund', amount: 0, color: 'text-red-500' }
+    : null;
+
   // Cancel state
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -240,22 +249,32 @@ const BookingCard = ({ booking, onCancel, onUpdateDates }) => {
               {canCancel && (
                 <div className="flex items-center gap-2">
                   {confirmCancel ? (
-                    <>
-                      <span className="text-xs text-gray-500 hidden sm:inline">Cancel this booking?</span>
-                      <button
-                        onClick={handleConfirmCancel}
-                        disabled={cancelling}
-                        className="text-xs font-bold text-red-600 border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-full transition disabled:opacity-50"
-                      >
-                        {cancelling ? 'Cancelling…' : 'Yes, Cancel'}
-                      </button>
-                      <button
-                        onClick={() => setConfirmCancel(false)}
-                        className="text-xs font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 px-3 py-1.5 rounded-full transition"
-                      >
-                        No
-                      </button>
-                    </>
+                    <div className="flex flex-col gap-2 items-end">
+                      <div className="text-xs text-right">
+                        <span className="text-gray-500">Cancel booking? </span>
+                        <span className={`font-bold ${refundInfo?.color}`}>
+                          {refundInfo?.amount > 0
+                            ? `₹${refundInfo.amount.toLocaleString('en-IN')} ${refundInfo.label}`
+                            : refundInfo?.label}
+                        </span>
+                        <span className="text-gray-400"> will be refunded.</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleConfirmCancel}
+                          disabled={cancelling}
+                          className="text-xs font-bold text-red-600 border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-full transition disabled:opacity-50"
+                        >
+                          {cancelling ? 'Cancelling…' : 'Yes, Cancel'}
+                        </button>
+                        <button
+                          onClick={() => setConfirmCancel(false)}
+                          className="text-xs font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 px-3 py-1.5 rounded-full transition"
+                        >
+                          Keep Booking
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     <button
                       onClick={() => setConfirmCancel(true)}
