@@ -78,3 +78,28 @@ function fetchAndCache(request) {
     return response;
   });
 }
+
+// Push notifications
+self.addEventListener('push', (event) => {
+  const data = event.data?.json() ?? { title: 'The Golden Stay', body: 'You have a new notification.' };
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/favicon.png',
+      badge: '/favicon.png',
+      data: { url: data.url || '/' },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      const existing = windowClients.find(c => c.url.includes(self.location.origin));
+      if (existing) { existing.focus(); existing.navigate(url); }
+      else clients.openWindow(url);
+    })
+  );
+});

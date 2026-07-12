@@ -9,7 +9,7 @@ import WishlistButton from '../components/WishlistButton';
 import { StarPicker, StarDisplay } from '../components/StarRating';
 import { getPropertyReviews, submitReview } from '../lib/reviews';
 import { useAuth } from '../context/AuthContextUtils';
-import { getPropertyAvailability, hasDateConflict } from '../lib/availability';
+import { getPropertyAvailability, hasDateConflict, getBlockedDates, hasBlockedConflict } from '../lib/availability';
 
 const CLEANING_FEE = 500;
 const SERVICE_FEE = 300;
@@ -42,13 +42,13 @@ const PropertyDetails = () => {
   const [guests, setGuests] = useState('2');
   const [dateError, setDateError] = useState('');
 
-  // Availability
+  // Availability (booked) + blocked dates
   const [availability, setAvailability] = useState([]);
+  const [blockedDates, setBlockedDates] = useState([]);
   useEffect(() => {
     if (property?.id) {
-      getPropertyAvailability(property.id)
-        .then(setAvailability)
-        .catch(() => {});
+      getPropertyAvailability(property.id).then(setAvailability).catch(() => {});
+      getBlockedDates(property.id).then(setBlockedDates).catch(() => {});
     }
   }, [property?.id]);
 
@@ -106,6 +106,10 @@ const PropertyDetails = () => {
     }
     if (hasDateConflict(availability, checkin, checkout)) {
       setDateError('Sorry, this property is already booked for those dates. Please choose different dates.');
+      return;
+    }
+    if (hasBlockedConflict(blockedDates, checkin, checkout)) {
+      setDateError('This property is unavailable for the selected dates. Please choose different dates.');
       return;
     }
     navigate('/checkout', {

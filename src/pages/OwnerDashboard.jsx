@@ -3,13 +3,15 @@ import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../context/AuthContextUtils';
 import { getAllBookings, updateBookingStatus } from '../lib/adminBookings';
 import { getContactMessages } from '../lib/contact';
-import { getProperties, createProperty, updateProperty, deleteProperty } from '../lib/properties';
+import { getProperties, createProperty, updateProperty, deleteProperty, uploadPropertyImage } from '../lib/properties';
+import { getBlockedDates, addBlockedDate, removeBlockedDate } from '../lib/availability';
+import { supabase } from '../lib/supabase';
 import {
   TrendingUp, Calendar, Home, CreditCard,
   Search, RefreshCw, BarChart2, Users,
   Globe, ToggleLeft, ToggleRight, Mail,
   ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X,
-  Download, Reply,
+  Download, Reply, CalendarX, Upload, ImageIcon,
 } from 'lucide-react';
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
@@ -59,6 +61,25 @@ const OwnerDashboard = () => {
   const [propSaving, setPropSaving] = useState(false);
   const [propError, setPropError] = useState('');
   const [deletingPropId, setDeletingPropId] = useState(null);
+
+  // Image upload
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState('');
+
+  // Promo codes tab
+  const [promos, setPromos] = useState([]);
+  const [promosLoading, setPromosLoading] = useState(false);
+  const [promoForm, setPromoForm] = useState({ code: '', discount_type: 'percent', discount_value: '', min_booking: '0', uses_left: '-1', expires_at: '' });
+  const [promoSaving, setPromoSaving] = useState(false);
+  const [promoFormError, setPromoFormError] = useState('');
+  const [showPromoForm, setShowPromoForm] = useState(false);
+
+  // Date blocking
+  const [blockingPropId, setBlockingPropId] = useState(null);
+  const [blockedMap, setBlockedMap] = useState({});
+  const [blockForm, setBlockForm] = useState({ start: '', end: '', reason: '' });
+  const [blockSaving, setBlockSaving] = useState(false);
+  const [blockError, setBlockError] = useState('');
 
   // Channel manager: per-property platform toggles
   const [channels, setChannels] = useState({});
@@ -218,6 +239,83 @@ const OwnerDashboard = () => {
     finally { setDeletingPropId(null); }
   };
 
+  const openBlockingPanel = async (propId) => {
+    if (blockingPropId === propId) { setBlockingPropId(null); return; }
+    setBlockingPropId(propId);
+    setBlockForm({ start: '', end: '', reason: '' });
+    setBlockError('');
+    if (!blockedMap[propId]) {
+      const data = await getBlockedDates(propId).catch(() => []);
+      setBlockedMap(prev => ({ ...prev, [propId]: data }));
+    }
+  };
+
+  const handleAddBlock = async (propId) => {
+    if (!blockForm.start || !blockForm.end) { setBlockError('Select both start and end dates.'); return; }
+    if (blockForm.end <= blockForm.start) { setBlockError('End date must be after start date.'); return; }
+    setBlockSaving(true); setBlockError('');
+    try {
+      const newBlock = await addBlockedDate(propId, blockForm.start, blockForm.end, blockForm.reason);
+      setBlockedMap(prev => ({ ...prev, [propId]: [...(prev[propId] || []), newBlock] }));
+      setBlockForm({ start: '', end: '', reason: '' });
+    } catch (err) {
+      setBlockError(err?.message || 'Failed to block dates.');
+    } finally {
+      setBlockSaving(false);
+    }
+  };
+
+  const handleRemoveBlock = async (blockId, propId) => {
+    try {
+      await removeBlockedDate(blockId);
+      setBlockedMap(prev => ({ ...prev, [propId]: prev[propId].filter(b => b.id !== blockId) }));
+    } catch {}
+  };
+
+  const fetchPromos = useCallback(async () => {
+    setPromosLoading(true);
+    const { data } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
+    setPromos(data || []);
+    setPromosLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (isAdmin && activeTab === 'promos') fetchPromos();
+  }, [isAdmin, activeTab, fetchPromos]);
+
+  const handleAddPromo = async (e) => {
+    e.preventDefault();
+    if (!promoForm.code.trim()) { setPromoFormError('Code is required.'); return; }
+    if (!promoForm.discount_value) { setPromoFormError('Discount value is required.'); return; }
+    setPromoSaving(true); setPromoFormError('');
+    const payload = {
+      code: promoForm.code.toUpperCase().trim(),
+      discount_type: promoForm.discount_type,
+      discount_value: parseInt(promoForm.discount_value, 10),
+      min_booking: parseInt(promoForm.min_booking, 10) || 0,
+      uses_left: parseInt(promoForm.uses_left, 10),
+      expires_at: promoForm.expires_at || null,
+      is_active: true,
+    };
+    const { error } = await supabase.from('promo_codes').upsert(payload, { onConflict: 'code' });
+    if (error) { setPromoFormError(error.message); setPromoSaving(false); return; }
+    await fetchPromos();
+    setPromoForm({ code: '', discount_type: 'percent', discount_value: '', min_booking: '0', uses_left: '-1', expires_at: '' });
+    setShowPromoForm(false);
+    setPromoSaving(false);
+  };
+
+  const togglePromoActive = async (code, current) => {
+    await supabase.from('promo_codes').update({ is_active: !current }).eq('code', code);
+    setPromos(prev => prev.map(p => p.code === code ? { ...p, is_active: !current } : p));
+  };
+
+  const deletePromo = async (code) => {
+    if (!window.confirm(`Delete promo code ${code}?`)) return;
+    await supabase.from('promo_codes').delete().eq('code', code);
+    setPromos(prev => prev.filter(p => p.code !== code));
+  };
+
   const totalRevenue = useMemo(() => bookings.reduce((s, b) => s + (b.total || 0), 0), [bookings]);
   const avgValue = bookings.length ? Math.round(totalRevenue / bookings.length) : 0;
 
@@ -317,6 +415,7 @@ const OwnerDashboard = () => {
     { id: 'properties', label: 'Properties', icon: Home },
     { id: 'messages', label: `Messages${messages.length ? ` (${messages.length})` : ''}`, icon: Mail },
     { id: 'channels', label: 'Channel Manager', icon: Globe },
+    { id: 'promos', label: 'Promo Codes', icon: CreditCard },
   ];
 
   const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-golden/40';
@@ -526,14 +625,49 @@ const OwnerDashboard = () => {
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className={labelCls}>Cover Image URL</label>
-                      <input
-                        type="url"
-                        placeholder="https://images.unsplash.com/…"
-                        value={propForm.image}
-                        onChange={e => setPropForm(f => ({ ...f, image: e.target.value }))}
-                        className={inputCls}
-                      />
+                      <label className={labelCls}>Cover Image</label>
+                      <div className="flex gap-3 items-start">
+                        {propForm.image && (
+                          <div className="w-20 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-100 border border-gray-200">
+                            <img src={propForm.image} alt="Preview" className="w-full h-full object-cover" />
+                          </div>
+                        )}
+                        <div className="flex-1 space-y-2">
+                          <label className="flex items-center gap-2 cursor-pointer border-2 border-dashed border-gray-200 hover:border-golden rounded-xl px-4 py-3 transition text-sm text-gray-500 hover:text-golden">
+                            {imageUploading ? (
+                              <svg className="animate-spin h-4 w-4 text-golden" viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                              </svg>
+                            ) : <Upload size={15} />}
+                            {imageUploading ? 'Uploading…' : 'Upload image'}
+                            <input type="file" accept="image/*" className="sr-only" disabled={imageUploading}
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                if (file.size > 5 * 1024 * 1024) { setImageUploadError('Max file size is 5 MB.'); return; }
+                                setImageUploading(true); setImageUploadError('');
+                                try {
+                                  const url = await uploadPropertyImage(file);
+                                  setPropForm(f => ({ ...f, image: url }));
+                                } catch (err) {
+                                  setImageUploadError(err?.message || 'Upload failed.');
+                                } finally {
+                                  setImageUploading(false);
+                                }
+                              }}
+                            />
+                          </label>
+                          <input
+                            type="url"
+                            placeholder="Or paste image URL"
+                            value={propForm.image}
+                            onChange={e => setPropForm(f => ({ ...f, image: e.target.value }))}
+                            className={inputCls}
+                          />
+                          {imageUploadError && <p className="text-red-500 text-xs">{imageUploadError}</p>}
+                        </div>
+                      </div>
                     </div>
                     <div className="sm:col-span-2">
                       <label className={labelCls}>Description</label>
@@ -680,6 +814,13 @@ const OwnerDashboard = () => {
                               <Pencil size={15} />
                             </button>
                             <button
+                              onClick={() => openBlockingPanel(p.id)}
+                              className={`p-2 rounded-lg transition ${blockingPropId === p.id ? 'text-orange-500 bg-orange-50' : 'text-gray-400 hover:text-orange-500 hover:bg-orange-50'}`}
+                              title="Block dates"
+                            >
+                              <CalendarX size={15} />
+                            </button>
+                            <button
                               onClick={() => handleDeleteProp(p.id)}
                               disabled={deletingPropId === p.id}
                               className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
@@ -696,6 +837,64 @@ const OwnerDashboard = () => {
                         </div>
                       </div>
                     </div>
+                    {/* Block Dates Panel */}
+                    {blockingPropId === p.id && (
+                      <div className="mx-4 mb-4 p-4 bg-orange-50 border border-orange-100 rounded-xl">
+                        <p className="text-xs font-bold text-orange-700 mb-3 flex items-center gap-1.5">
+                          <CalendarX size={13} /> Block Dates — guests cannot book these periods
+                        </p>
+                        {/* Existing blocks */}
+                        {(blockedMap[p.id] || []).length > 0 && (
+                          <div className="mb-3 space-y-1.5">
+                            {(blockedMap[p.id] || []).map(b => (
+                              <div key={b.id} className="flex items-center justify-between bg-white border border-orange-200 rounded-lg px-3 py-1.5">
+                                <span className="text-xs text-charcoal font-medium">
+                                  {new Date(b.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                  {' → '}
+                                  {new Date(b.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                  {b.reason && <span className="text-gray-400 ml-1.5">· {b.reason}</span>}
+                                </span>
+                                <button onClick={() => handleRemoveBlock(b.id, p.id)} className="text-red-400 hover:text-red-600 ml-3">
+                                  <X size={13} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {/* Add new block */}
+                        <div className="flex flex-wrap gap-2 items-end">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs text-gray-500 font-medium">From</label>
+                            <input type="date" value={blockForm.start} min={new Date().toISOString().split('T')[0]}
+                              onChange={e => setBlockForm(f => ({ ...f, start: e.target.value }))}
+                              className="text-xs border border-orange-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs text-gray-500 font-medium">To</label>
+                            <input type="date" value={blockForm.end} min={blockForm.start || new Date().toISOString().split('T')[0]}
+                              onChange={e => setBlockForm(f => ({ ...f, end: e.target.value }))}
+                              className="text-xs border border-orange-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 flex-1 min-w-32">
+                            <label className="text-xs text-gray-500 font-medium">Reason (optional)</label>
+                            <input type="text" placeholder="e.g. Renovation" value={blockForm.reason}
+                              onChange={e => setBlockForm(f => ({ ...f, reason: e.target.value }))}
+                              className="text-xs border border-orange-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white"
+                            />
+                          </div>
+                          <button
+                            onClick={() => handleAddBlock(p.id)}
+                            disabled={blockSaving}
+                            className="text-xs font-bold px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition disabled:opacity-60"
+                          >
+                            {blockSaving ? 'Saving…' : 'Block'}
+                          </button>
+                        </div>
+                        {blockError && <p className="text-red-500 text-xs mt-2">{blockError}</p>}
+                      </div>
+                    )}
                   ))}
                 </div>
               )}
@@ -797,6 +996,132 @@ const OwnerDashboard = () => {
                     <p className="text-gray-600 text-sm leading-relaxed">{m.message}</p>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Promo Codes */}
+        {activeTab === 'promos' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-bold text-charcoal flex items-center gap-2 text-base">
+                <CreditCard size={16} className="text-golden" /> Promo Codes
+              </h2>
+              <button
+                onClick={() => { setShowPromoForm(f => !f); setPromoFormError(''); }}
+                className="flex items-center gap-2 bg-golden hover:bg-golden-dark text-white text-sm font-bold px-4 py-2 rounded-full transition"
+              >
+                <Plus size={14} /> {showPromoForm ? 'Cancel' : 'Add Code'}
+              </button>
+            </div>
+
+            {showPromoForm && (
+              <form onSubmit={handleAddPromo} className="p-5 border-b border-gray-100 bg-gray-50">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className={labelCls}>Code</label>
+                    <input type="text" placeholder="e.g. SAVE20" value={promoForm.code}
+                      onChange={e => setPromoForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                      className={inputCls} required
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Discount Type</label>
+                    <select value={promoForm.discount_type}
+                      onChange={e => setPromoForm(f => ({ ...f, discount_type: e.target.value }))}
+                      className={inputCls}
+                    >
+                      <option value="percent">Percent (%)</option>
+                      <option value="flat">Flat (₹)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Discount Value</label>
+                    <input type="number" min="1" placeholder={promoForm.discount_type === 'percent' ? '10' : '500'} value={promoForm.discount_value}
+                      onChange={e => setPromoForm(f => ({ ...f, discount_value: e.target.value }))}
+                      className={inputCls} required
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Min Booking (₹)</label>
+                    <input type="number" min="0" value={promoForm.min_booking}
+                      onChange={e => setPromoForm(f => ({ ...f, min_booking: e.target.value }))}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Uses Left (−1 = unlimited)</label>
+                    <input type="number" min="-1" value={promoForm.uses_left}
+                      onChange={e => setPromoForm(f => ({ ...f, uses_left: e.target.value }))}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Expires At</label>
+                    <input type="datetime-local" value={promoForm.expires_at}
+                      onChange={e => setPromoForm(f => ({ ...f, expires_at: e.target.value }))}
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+                {promoFormError && <p className="text-red-500 text-sm mb-3">{promoFormError}</p>}
+                <button type="submit" disabled={promoSaving}
+                  className="bg-golden hover:bg-golden-dark text-white font-bold px-6 py-2.5 rounded-xl text-sm transition disabled:opacity-60"
+                >
+                  {promoSaving ? 'Saving…' : 'Save Code'}
+                </button>
+              </form>
+            )}
+
+            {promosLoading ? (
+              <div className="p-14 flex items-center justify-center">
+                <svg className="animate-spin h-7 w-7 text-golden" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+              </div>
+            ) : promos.length === 0 ? (
+              <div className="p-14 text-center text-gray-400 text-sm">No promo codes yet. Add one above.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                      {['Code','Type','Value','Min Booking','Uses Left','Expires','Status',''].map(h => (
+                        <th key={h} className="text-left text-xs font-bold text-gray-500 uppercase tracking-wide px-4 py-3">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {promos.map(p => (
+                      <tr key={p.code} className="hover:bg-gray-50/50">
+                        <td className="px-4 py-3 font-bold text-charcoal font-mono">{p.code}</td>
+                        <td className="px-4 py-3 text-gray-500 capitalize">{p.discount_type}</td>
+                        <td className="px-4 py-3 font-bold text-golden">
+                          {p.discount_type === 'flat' ? `₹${p.discount_value}` : `${p.discount_value}%`}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500">{p.min_booking > 0 ? fmt(p.min_booking) : '—'}</td>
+                        <td className="px-4 py-3 text-gray-500">{p.uses_left === -1 ? '∞' : p.uses_left}</td>
+                        <td className="px-4 py-3 text-gray-500 text-xs">
+                          {p.expires_at ? fmtDate(p.expires_at) : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button onClick={() => togglePromoActive(p.code, p.is_active)}
+                            className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${p.is_active ? 'text-green-600 bg-green-50 border-green-200 hover:bg-green-100' : 'text-gray-400 bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
+                          >
+                            {p.is_active ? 'Active' : 'Inactive'}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button onClick={() => deletePromo(p.code)} className="text-gray-300 hover:text-red-500 transition">
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

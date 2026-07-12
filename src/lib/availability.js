@@ -18,3 +18,39 @@ export const hasDateConflict = (bookedRanges, newCheckin, newCheckout) => {
     return newStart < bookedEnd && newEnd > bookedStart;
   });
 };
+
+// Blocked dates — owner-controlled
+export const getBlockedDates = async (propertyId) => {
+  const today = new Date().toISOString().split('T')[0];
+  const { data, error } = await supabase
+    .from('blocked_dates')
+    .select('*')
+    .eq('property_id', propertyId)
+    .gte('end_date', today)
+    .order('start_date', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+};
+
+export const addBlockedDate = async (propertyId, startDate, endDate, reason = '') => {
+  const { data, error } = await supabase
+    .from('blocked_dates')
+    .insert({ property_id: propertyId, start_date: startDate, end_date: endDate, reason })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
+
+export const removeBlockedDate = async (id) => {
+  const { error } = await supabase.from('blocked_dates').delete().eq('id', id);
+  if (error) throw error;
+};
+
+export const hasBlockedConflict = (blockedRanges, newCheckin, newCheckout) => {
+  const newStart = new Date(newCheckin);
+  const newEnd = new Date(newCheckout);
+  return blockedRanges.some(({ start_date, end_date }) => {
+    return newStart < new Date(end_date) && newEnd > new Date(start_date);
+  });
+};

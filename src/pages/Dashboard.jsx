@@ -4,13 +4,15 @@ import { useAuth } from '../context/AuthContextUtils';
 import { getUserBookings, cancelBooking } from '../lib/bookings';
 import BookingCard from '../components/BookingCard';
 import { Helmet } from 'react-helmet-async';
-import { Home, Calendar, User, LogOut, RefreshCw, Heart, Award, Settings } from 'lucide-react';
+import { Home, Calendar, User, LogOut, RefreshCw, Heart, Award, Settings, Bell, BellOff } from 'lucide-react';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [fetchError, setFetchError] = useState('');
+  const { supported: pushSupported, subscribed, loading: pushLoading, subscribe, unsubscribe } = usePushNotifications();
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest';
   const joinedDate = user?.created_at
@@ -170,7 +172,7 @@ const Dashboard = () => {
               <Settings size={12} /> Edit Profile
             </Link>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm mb-4">
             {[
               { label: 'Full Name', value: displayName },
               { label: 'Email', value: user?.email, truncate: true },
@@ -183,6 +185,27 @@ const Dashboard = () => {
               </div>
             ))}
           </div>
+          {pushSupported && (
+            <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+              <div>
+                <p className="text-sm font-bold text-charcoal">Booking Notifications</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {subscribed ? 'You\'ll receive updates for bookings and alerts.' : 'Get notified about your bookings.'}
+                </p>
+              </div>
+              <button
+                onClick={subscribed ? unsubscribe : subscribe}
+                disabled={pushLoading}
+                className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border transition disabled:opacity-60 ${
+                  subscribed
+                    ? 'text-gray-500 border-gray-200 hover:text-red-500 hover:border-red-200'
+                    : 'text-golden border-golden hover:bg-golden hover:text-white'
+                }`}
+              >
+                {subscribed ? <><BellOff size={13} /> Turn off</> : <><Bell size={13} /> Enable</>}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Upcoming Trips */}
