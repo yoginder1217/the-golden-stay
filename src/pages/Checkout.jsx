@@ -22,8 +22,10 @@ const Checkout = () => {
     }
   }, []);
 
-  const { property, checkin, checkout, guests, nights, subtotal, cleaningFee, serviceFee, total } =
-    state || {};
+  const { property, checkin, checkout, guests, nights, subtotal, cleaningFee, serviceFee, total,
+    weekendPremium, weekdayNights, weekendNights, weekendPrice } = state || {};
+
+  const hasVariableRates = weekendPremium > 0 && weekendNights > 0 && weekdayNights > 0;
 
   const [form, setForm] = useState({ name: '', email: '', phone: '' });
   const [errors, setErrors] = useState({});
@@ -350,10 +352,27 @@ const Checkout = () => {
               </div>
 
               <div className="border-t border-gray-100 pt-4 space-y-2 text-sm">
-                <div className="flex justify-between text-gray-600">
-                  <span>₹{property.price?.toLocaleString('en-IN')} × {nights} {nights === 1 ? 'night' : 'nights'}</span>
-                  <span>₹{subtotal?.toLocaleString('en-IN')}</span>
-                </div>
+                {hasVariableRates ? (
+                  <>
+                    {weekdayNights > 0 && (
+                      <div className="flex justify-between text-gray-600">
+                        <span>₹{property.price?.toLocaleString('en-IN')} × {weekdayNights} weekday {weekdayNights === 1 ? 'night' : 'nights'}</span>
+                        <span>₹{(weekdayNights * property.price).toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    {weekendNights > 0 && (
+                      <div className="flex justify-between text-gray-600">
+                        <span>₹{weekendPrice?.toLocaleString('en-IN')} × {weekendNights} weekend {weekendNights === 1 ? 'night' : 'nights'}</span>
+                        <span>₹{(weekendNights * weekendPrice).toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex justify-between text-gray-600">
+                    <span>₹{property.price?.toLocaleString('en-IN')} × {nights} {nights === 1 ? 'night' : 'nights'}</span>
+                    <span>₹{subtotal?.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-gray-600">
                   <span>Cleaning fee</span><span>₹{cleaningFee}</span>
                 </div>

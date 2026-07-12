@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getPropertyById } from '../lib/properties';
+import { calculateDynamicPricing } from '../lib/pricing';
 import { Wifi, Home, Star, MapPin, CheckCircle, ExternalLink, ArrowRight, Users, Calendar, MessageSquare, LogIn } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import WishlistButton from '../components/WishlistButton';
@@ -81,7 +82,10 @@ const PropertyDetails = () => {
       ? Math.max(1, Math.ceil((new Date(checkout) - new Date(checkin)) / (1000 * 60 * 60 * 24)))
       : 0;
 
-  const subtotal = property ? property.price * (nights || 1) : 0;
+  const dynamicPricing = property
+    ? calculateDynamicPricing(property.price, checkin, checkout, property.weekend_premium || 0)
+    : { subtotal: 0, weekdayNights: 0, weekendNights: 0, weekdayPrice: 0, weekendPrice: 0, hasVariableRates: false };
+  const subtotal = dynamicPricing.subtotal;
   const total = subtotal + CLEANING_FEE + SERVICE_FEE;
 
   const handleCheckinChange = (e) => {
@@ -112,6 +116,10 @@ const PropertyDetails = () => {
         cleaningFee: CLEANING_FEE,
         serviceFee: SERVICE_FEE,
         total,
+        weekendPremium: property.weekend_premium || 0,
+        weekdayNights: dynamicPricing.weekdayNights,
+        weekendNights: dynamicPricing.weekendNights,
+        weekendPrice: dynamicPricing.weekendPrice,
       },
     });
   };
@@ -374,6 +382,11 @@ const PropertyDetails = () => {
               <div>
                 <span className="text-3xl font-bold text-charcoal">₹{property.price.toLocaleString('en-IN')}</span>
                 <span className="text-gray-400"> / night</span>
+                {property.weekend_premium > 0 && (
+                  <div className="text-xs text-amber-600 font-bold mt-1">
+                    ₹{Math.round(property.price * (1 + property.weekend_premium / 100)).toLocaleString('en-IN')}/night on Fri &amp; Sat
+                  </div>
+                )}
               </div>
               <span className="text-green-600 text-sm font-bold bg-green-50 px-2 py-1 rounded">Available</span>
             </div>
@@ -432,10 +445,27 @@ const PropertyDetails = () => {
                 animate={{ opacity: 1, height: 'auto' }}
                 className="border-t border-b border-gray-100 py-4 mb-4 space-y-2 text-sm"
               >
-                <div className="flex justify-between text-gray-600">
-                  <span>₹{property.price.toLocaleString('en-IN')} × {nights} {nights === 1 ? 'night' : 'nights'}</span>
-                  <span>₹{subtotal.toLocaleString('en-IN')}</span>
-                </div>
+                {dynamicPricing.hasVariableRates ? (
+                  <>
+                    {dynamicPricing.weekdayNights > 0 && (
+                      <div className="flex justify-between text-gray-600">
+                        <span>₹{property.price.toLocaleString('en-IN')} × {dynamicPricing.weekdayNights} weekday {dynamicPricing.weekdayNights === 1 ? 'night' : 'nights'}</span>
+                        <span>₹{(dynamicPricing.weekdayNights * dynamicPricing.weekdayPrice).toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    {dynamicPricing.weekendNights > 0 && (
+                      <div className="flex justify-between text-gray-600">
+                        <span>₹{dynamicPricing.weekendPrice.toLocaleString('en-IN')} × {dynamicPricing.weekendNights} weekend {dynamicPricing.weekendNights === 1 ? 'night' : 'nights'}</span>
+                        <span>₹{(dynamicPricing.weekendNights * dynamicPricing.weekendPrice).toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex justify-between text-gray-600">
+                    <span>₹{property.price.toLocaleString('en-IN')} × {nights} {nights === 1 ? 'night' : 'nights'}</span>
+                    <span>₹{subtotal.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-gray-600">
                   <span>Cleaning fee</span><span>₹{CLEANING_FEE}</span>
                 </div>

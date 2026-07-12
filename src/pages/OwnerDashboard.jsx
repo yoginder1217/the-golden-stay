@@ -26,7 +26,7 @@ const STATUS_COLORS = {
 
 const EMPTY_PROP_FORM = {
   title: '', type: '2BHK', city: '', location: '',
-  price: '', image: '', description: '',
+  price: '', weekend_premium: '0', image: '', description: '',
   amenities: '', airbnb: '', mmt: '', goibibo: '',
 };
 
@@ -152,6 +152,7 @@ const OwnerDashboard = () => {
       city: p.city,
       location: p.location,
       price: String(p.price),
+      weekend_premium: String(p.weekend_premium || 0),
       image: p.image || '',
       description: p.description || '',
       amenities: (p.amenities || []).join(', '),
@@ -178,6 +179,7 @@ const OwnerDashboard = () => {
         city: propForm.city.trim(),
         location: propForm.location.trim(),
         price: parseInt(propForm.price, 10),
+        weekend_premium: parseInt(propForm.weekend_premium, 10) || 0,
         image: propForm.image.trim() || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=800',
         description: propForm.description.trim(),
         amenities: propForm.amenities.split(',').map(s => s.trim()).filter(Boolean),
@@ -417,6 +419,19 @@ const OwnerDashboard = () => {
                       />
                     </div>
                     <div>
+                      <label className={labelCls}>Weekend Premium (%)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 20"
+                        min="0"
+                        max="100"
+                        value={propForm.weekend_premium}
+                        onChange={e => setPropForm(f => ({ ...f, weekend_premium: e.target.value }))}
+                        className={inputCls}
+                      />
+                      <p className="text-xs text-gray-400 mt-1">0 = flat rate. e.g. 20 = 20% more on Fri &amp; Sat nights.</p>
+                    </div>
+                    <div>
                       <label className={labelCls}>City *</label>
                       <input
                         type="text"
@@ -580,8 +595,11 @@ const OwnerDashboard = () => {
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                             <span className="text-sm font-bold text-golden">₹{Number(p.price).toLocaleString('en-IN')}/night</span>
+                            {p.weekend_premium > 0 && (
+                              <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-bold">+{p.weekend_premium}% wknd</span>
+                            )}
                             <button
                               onClick={() => handleEditProp(p)}
                               className="p-2 text-gray-400 hover:text-golden hover:bg-golden/10 rounded-lg transition"
