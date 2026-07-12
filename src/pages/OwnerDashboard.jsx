@@ -26,7 +26,7 @@ const STATUS_COLORS = {
 
 const EMPTY_PROP_FORM = {
   title: '', type: '2BHK', city: '', location: '',
-  price: '', weekend_premium: '0', image: '', description: '',
+  price: '', weekend_premium: 0, image: '', description: '',
   amenities: '', airbnb: '', mmt: '', goibibo: '',
 };
 
@@ -152,7 +152,7 @@ const OwnerDashboard = () => {
       city: p.city,
       location: p.location,
       price: String(p.price),
-      weekend_premium: String(p.weekend_premium || 0),
+      weekend_premium: p.weekend_premium || 0,
       image: p.image || '',
       description: p.description || '',
       amenities: (p.amenities || []).join(', '),
@@ -179,7 +179,7 @@ const OwnerDashboard = () => {
         city: propForm.city.trim(),
         location: propForm.location.trim(),
         price: parseInt(propForm.price, 10),
-        weekend_premium: parseInt(propForm.weekend_premium, 10) || 0,
+        weekend_premium: Math.round(propForm.weekend_premium) || 0,
         image: propForm.image.trim() || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=800',
         description: propForm.description.trim(),
         amenities: propForm.amenities.split(',').map(s => s.trim()).filter(Boolean),
@@ -426,7 +426,7 @@ const OwnerDashboard = () => {
                         min="0"
                         max="100"
                         value={propForm.weekend_premium}
-                        onChange={e => setPropForm(f => ({ ...f, weekend_premium: e.target.value }))}
+                        onChange={e => setPropForm(f => ({ ...f, weekend_premium: e.target.valueAsNumber || 0 }))}
                         className={inputCls}
                       />
                       <p className="text-xs text-gray-400 mt-1">0 = flat rate. e.g. 20 = 20% more on Fri &amp; Sat nights.</p>
