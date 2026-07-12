@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/ScrollToTop';
@@ -28,17 +28,12 @@ import Wishlist from './pages/Wishlist';
 import Profile from './pages/Profile';
 import RefundPolicy from './pages/RefundPolicy';
 
-function App() {
+function RoutedMain() {
+  const location = useLocation();
   return (
-    <AuthProvider>
-      <Router>
-        <ScrollToTop />
-        <div className="flex flex-col min-h-screen font-sans text-charcoal relative">
-          <Navbar />
-
-          <main className="flex-grow">
-            <ErrorBoundary>
-            <Routes>
+    <main className="flex-grow">
+      <ErrorBoundary key={location.pathname}>
+        <Routes>
               {/* Public routes */}
               <Route path="/" element={<Home />} />
               <Route path="/properties" element={<Properties />} />
@@ -80,9 +75,19 @@ function App() {
 
               <Route path="*" element={<NotFound />} />
             </Routes>
-            </ErrorBoundary>
-          </main>
+        </ErrorBoundary>
+    </main>
+  );
+}
 
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <ScrollToTop />
+        <div className="flex flex-col min-h-screen font-sans text-charcoal relative">
+          <Navbar />
+          <RoutedMain />
           <Footer />
           <WhatsAppButton />
         </div>
