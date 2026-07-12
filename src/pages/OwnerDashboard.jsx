@@ -781,7 +781,8 @@ const OwnerDashboard = () => {
               ) : (
                 <div className="divide-y divide-gray-50">
                   {propertiesData.map(p => (
-                    <div key={p.id} className="p-4 flex gap-4 hover:bg-gray-50/50 transition items-start">
+                    <React.Fragment key={p.id}>
+                    <div className="p-4 flex gap-4 hover:bg-gray-50/50 transition items-start">
                       <div className="w-20 h-16 shrink-0 rounded-xl overflow-hidden bg-gray-100">
                         {p.image && (
                           <img src={p.image} alt={p.title} className="w-full h-full object-cover" loading="lazy" />
@@ -895,6 +896,7 @@ const OwnerDashboard = () => {
                         {blockError && <p className="text-red-500 text-xs mt-2">{blockError}</p>}
                       </div>
                     )}
+                    </React.Fragment>
                   ))}
                 </div>
               )}
