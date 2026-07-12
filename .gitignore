@@ -34,3 +34,4 @@ dist-ssr
 !package.json
 !package-lock.json
 !tsconfig*.json
+!public/manifest.json
