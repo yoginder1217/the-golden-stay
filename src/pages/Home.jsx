@@ -241,7 +241,7 @@ const Home = () => {
               { city: 'Delhi', img: 'https://images.unsplash.com/photo-1587474260584-136574528ed5?auto=format&fit=crop&q=80&w=400', count: 1 },
               { city: 'Gurugram', img: 'https://images.unsplash.com/photo-1560185007-cde436f6a4d0?auto=format&fit=crop&q=80&w=400', count: 1 },
               { city: 'Mumbai', img: 'https://images.unsplash.com/photo-1566552881560-0be862a7c445?auto=format&fit=crop&q=80&w=400', count: 1 },
-              { city: 'Jaipur', img: 'https://images.unsplash.com/photo-1477587458883-47145ed31f1a?auto=format&fit=crop&q=80&w=400', count: 1 },
+              { city: 'Jaipur', img: 'https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&q=80&w=400', count: 1 },
               { city: 'Goa', img: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&q=80&w=400', count: 1 },
             ].map(({ city, img, count }) => (
               <motion.div key={city} variants={fadeInUp}>
