@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { properties } from '../data/properties';
+import { getPropertyById } from '../lib/properties';
 import { Wifi, Home, Star, MapPin, CheckCircle, ExternalLink, ArrowRight, Users, Calendar, MessageSquare, LogIn } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import WishlistButton from '../components/WishlistButton';
@@ -22,7 +22,17 @@ const PropertyDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const property = properties.find(p => p.id === parseInt(id, 10));
+
+  const [property, setProperty] = useState(null);
+  const [propLoading, setPropLoading] = useState(true);
+
+  useEffect(() => {
+    setPropLoading(true);
+    getPropertyById(parseInt(id, 10))
+      .then(setProperty)
+      .catch(() => setProperty(null))
+      .finally(() => setPropLoading(false));
+  }, [id]);
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -131,6 +141,17 @@ const PropertyDetails = () => {
       setReviewSubmitting(false);
     }
   };
+
+  if (propLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <svg className="animate-spin h-10 w-10 text-golden" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+        </svg>
+      </div>
+    );
+  }
 
   if (!property) {
     return (

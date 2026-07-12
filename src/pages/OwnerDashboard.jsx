@@ -3,12 +3,12 @@ import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../context/AuthContextUtils';
 import { getAllBookings, updateBookingStatus } from '../lib/adminBookings';
 import { getContactMessages } from '../lib/contact';
-import { properties } from '../data/properties';
+import { getProperties, createProperty, updateProperty, deleteProperty } from '../lib/properties';
 import {
   TrendingUp, Calendar, Home, CreditCard,
   Search, RefreshCw, BarChart2, Users,
   Globe, ToggleLeft, ToggleRight, Mail,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X,
 } from 'lucide-react';
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
@@ -22,6 +22,12 @@ const STATUS_COLORS = {
   pending:   'text-yellow-600 bg-yellow-50 border-yellow-200',
   cancelled: 'text-red-500 bg-red-50 border-red-200',
   completed: 'text-gray-500 bg-gray-50 border-gray-200',
+};
+
+const EMPTY_PROP_FORM = {
+  title: '', type: '2BHK', city: '', location: '',
+  price: '', image: '', description: '',
+  amenities: '', airbnb: '', mmt: '', goibibo: '',
 };
 
 const OwnerDashboard = () => {
@@ -43,10 +49,18 @@ const OwnerDashboard = () => {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messagesError, setMessagesError] = useState('');
 
-  // Channel manager: per-property platform toggles (UI state only)
-  const [channels, setChannels] = useState(() =>
-    Object.fromEntries(properties.map(p => [p.id, { airbnb: !!p.links?.airbnb, mmt: !!p.links?.mmt, goibibo: !!p.links?.goibibo }]))
-  );
+  // Properties tab
+  const [propertiesData, setPropertiesData] = useState([]);
+  const [propertiesLoading, setPropertiesLoading] = useState(false);
+  const [showPropForm, setShowPropForm] = useState(false);
+  const [editingProp, setEditingProp] = useState(null);
+  const [propForm, setPropForm] = useState(EMPTY_PROP_FORM);
+  const [propSaving, setPropSaving] = useState(false);
+  const [propError, setPropError] = useState('');
+  const [deletingPropId, setDeletingPropId] = useState(null);
+
+  // Channel manager: per-property platform toggles
+  const [channels, setChannels] = useState({});
 
   const fetchBookings = useCallback(async () => {
     setLoading(true);
@@ -74,16 +88,35 @@ const OwnerDashboard = () => {
     }
   }, []);
 
+  const fetchPropertiesData = useCallback(async () => {
+    setPropertiesLoading(true);
+    try {
+      const data = await getProperties();
+      setPropertiesData(data);
+      setChannels(prev => {
+        const next = { ...prev };
+        data.forEach(p => {
+          if (!next[p.id]) next[p.id] = { airbnb: !!p.links?.airbnb, mmt: !!p.links?.mmt, goibibo: !!p.links?.goibibo };
+        });
+        return next;
+      });
+    } catch {}
+    finally { setPropertiesLoading(false); }
+  }, []);
+
   useEffect(() => {
-    if (isAdmin) fetchBookings();
-    else setLoading(false);
-  }, [isAdmin, fetchBookings]);
+    if (isAdmin) {
+      fetchBookings();
+      fetchPropertiesData();
+    } else {
+      setLoading(false);
+    }
+  }, [isAdmin, fetchBookings, fetchPropertiesData]);
 
   useEffect(() => {
     if (isAdmin && activeTab === 'messages') fetchMessages();
   }, [isAdmin, activeTab, fetchMessages]);
 
-  // Reset page when filters change
   useEffect(() => { setPage(1); }, [search, statusFilter, propertyFilter]);
 
   const handleStatusChange = async (bookingId, newStatus) => {
@@ -100,8 +133,86 @@ const OwnerDashboard = () => {
   const toggleChannel = (propertyId, platform) => {
     setChannels(prev => ({
       ...prev,
-      [propertyId]: { ...prev[propertyId], [platform]: !prev[propertyId][platform] },
+      [propertyId]: { ...prev[propertyId], [platform]: !prev[propertyId]?.[platform] },
     }));
+  };
+
+  const openAddForm = () => {
+    setEditingProp(null);
+    setPropForm(EMPTY_PROP_FORM);
+    setPropError('');
+    setShowPropForm(true);
+  };
+
+  const handleEditProp = (p) => {
+    setEditingProp(p);
+    setPropForm({
+      title: p.title,
+      type: p.type,
+      city: p.city,
+      location: p.location,
+      price: String(p.price),
+      image: p.image || '',
+      description: p.description || '',
+      amenities: (p.amenities || []).join(', '),
+      airbnb: p.links?.airbnb || '',
+      mmt: p.links?.mmt || '',
+      goibibo: p.links?.goibibo || '',
+    });
+    setPropError('');
+    setShowPropForm(true);
+  };
+
+  const handlePropFormSubmit = async (e) => {
+    e.preventDefault();
+    if (!propForm.title || !propForm.city || !propForm.location || !propForm.price) {
+      setPropError('Title, city, location, and price are required.');
+      return;
+    }
+    setPropError('');
+    setPropSaving(true);
+    try {
+      const propertyData = {
+        title: propForm.title.trim(),
+        type: propForm.type,
+        city: propForm.city.trim(),
+        location: propForm.location.trim(),
+        price: parseInt(propForm.price, 10),
+        image: propForm.image.trim() || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=800',
+        description: propForm.description.trim(),
+        amenities: propForm.amenities.split(',').map(s => s.trim()).filter(Boolean),
+        links: {
+          ...(propForm.airbnb && { airbnb: propForm.airbnb.trim() }),
+          ...(propForm.mmt && { mmt: propForm.mmt.trim() }),
+          ...(propForm.goibibo && { goibibo: propForm.goibibo.trim() }),
+          direct: '/checkout',
+        },
+      };
+      if (editingProp) {
+        const updated = await updateProperty(editingProp.id, propertyData);
+        setPropertiesData(prev => prev.map(p => p.id === editingProp.id ? updated : p));
+      } else {
+        const created = await createProperty(propertyData);
+        setPropertiesData(prev => [...prev, created]);
+      }
+      setShowPropForm(false);
+      setEditingProp(null);
+      setPropForm(EMPTY_PROP_FORM);
+    } catch (err) {
+      setPropError(err?.message || 'Failed to save property. Check Supabase RLS permissions.');
+    } finally {
+      setPropSaving(false);
+    }
+  };
+
+  const handleDeleteProp = async (id) => {
+    if (!window.confirm('Delete this property? This action cannot be undone.')) return;
+    setDeletingPropId(id);
+    try {
+      await deleteProperty(id);
+      setPropertiesData(prev => prev.filter(p => p.id !== id));
+    } catch {}
+    finally { setDeletingPropId(null); }
   };
 
   const totalRevenue = useMemo(() => bookings.reduce((s, b) => s + (b.total || 0), 0), [bookings]);
@@ -150,15 +261,19 @@ const OwnerDashboard = () => {
   const stats = [
     { label: 'Total Revenue', value: fmt(totalRevenue), icon: TrendingUp, color: 'text-green-600 bg-green-50' },
     { label: 'Total Bookings', value: bookings.length, icon: Calendar, color: 'text-blue-600 bg-blue-50' },
-    { label: 'Properties', value: properties.length, icon: Home, color: 'text-purple-600 bg-purple-50' },
+    { label: 'Properties', value: propertiesData.length, icon: Home, color: 'text-purple-600 bg-purple-50' },
     { label: 'Avg Booking Value', value: fmt(avgValue), icon: CreditCard, color: 'text-golden bg-golden/10' },
   ];
 
   const tabs = [
     { id: 'bookings', label: 'All Bookings', icon: Users },
+    { id: 'properties', label: 'Properties', icon: Home },
     { id: 'messages', label: `Messages${messages.length ? ` (${messages.length})` : ''}`, icon: Mail },
     { id: 'channels', label: 'Channel Manager', icon: Globe },
   ];
+
+  const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-golden/40';
+  const labelCls = 'block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1';
 
   return (
     <div className="bg-gray-50 min-h-screen py-10">
@@ -248,6 +363,256 @@ const OwnerDashboard = () => {
           ))}
         </div>
 
+        {/* Properties Tab */}
+        {activeTab === 'properties' && (
+          <div className="space-y-4">
+            {showPropForm && (
+              <div className="bg-white rounded-2xl border border-golden/30 shadow-md p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="font-bold text-charcoal text-base">
+                    {editingProp ? 'Edit Property' : 'Add New Property'}
+                  </h2>
+                  <button
+                    onClick={() => { setShowPropForm(false); setEditingProp(null); setPropForm(EMPTY_PROP_FORM); }}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition"
+                  >
+                    <X size={18} className="text-gray-400" />
+                  </button>
+                </div>
+                <form onSubmit={handlePropFormSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>Property Title *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Golden Heights 3BHK Family Suite"
+                        value={propForm.title}
+                        onChange={e => setPropForm(f => ({ ...f, title: e.target.value }))}
+                        className={inputCls}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Type *</label>
+                      <select
+                        value={propForm.type}
+                        onChange={e => setPropForm(f => ({ ...f, type: e.target.value }))}
+                        className={inputCls}
+                      >
+                        <option value="2BHK">2BHK</option>
+                        <option value="3BHK">3BHK</option>
+                        <option value="Villa">Villa</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Price per Night (₹) *</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 4500"
+                        min="100"
+                        value={propForm.price}
+                        onChange={e => setPropForm(f => ({ ...f, price: e.target.value }))}
+                        className={inputCls}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>City *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Noida"
+                        value={propForm.city}
+                        onChange={e => setPropForm(f => ({ ...f, city: e.target.value }))}
+                        className={inputCls}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Location / Area *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Sector 62, Noida"
+                        value={propForm.location}
+                        onChange={e => setPropForm(f => ({ ...f, location: e.target.value }))}
+                        className={inputCls}
+                        required
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>Cover Image URL</label>
+                      <input
+                        type="url"
+                        placeholder="https://images.unsplash.com/…"
+                        value={propForm.image}
+                        onChange={e => setPropForm(f => ({ ...f, image: e.target.value }))}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>Description</label>
+                      <textarea
+                        placeholder="Describe the property, highlights, and nearby attractions…"
+                        value={propForm.description}
+                        onChange={e => setPropForm(f => ({ ...f, description: e.target.value }))}
+                        rows={3}
+                        className={inputCls + ' resize-none'}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>Amenities (comma-separated)</label>
+                      <input
+                        type="text"
+                        placeholder="WiFi, AC, Kitchen, Parking, TV, Washer"
+                        value={propForm.amenities}
+                        onChange={e => setPropForm(f => ({ ...f, amenities: e.target.value }))}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Airbnb URL</label>
+                      <input
+                        type="url"
+                        placeholder="https://www.airbnb.com/rooms/…"
+                        value={propForm.airbnb}
+                        onChange={e => setPropForm(f => ({ ...f, airbnb: e.target.value }))}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>MakeMyTrip URL</label>
+                      <input
+                        type="url"
+                        placeholder="https://www.makemytrip.com/…"
+                        value={propForm.mmt}
+                        onChange={e => setPropForm(f => ({ ...f, mmt: e.target.value }))}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>Goibibo URL</label>
+                      <input
+                        type="url"
+                        placeholder="https://www.goibibo.com/…"
+                        value={propForm.goibibo}
+                        onChange={e => setPropForm(f => ({ ...f, goibibo: e.target.value }))}
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                  {propError && <p className="text-red-500 text-sm">{propError}</p>}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="submit"
+                      disabled={propSaving}
+                      className="flex items-center gap-2 bg-golden hover:bg-golden-dark text-white font-bold px-6 py-2.5 rounded-xl transition text-sm disabled:opacity-60"
+                    >
+                      {propSaving && (
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                        </svg>
+                      )}
+                      {propSaving ? 'Saving…' : editingProp ? 'Save Changes' : 'Add Property'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowPropForm(false); setEditingProp(null); setPropForm(EMPTY_PROP_FORM); }}
+                      className="text-sm font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 px-6 py-2.5 rounded-xl transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="font-bold text-charcoal flex items-center gap-2 text-base">
+                  <Home size={16} className="text-golden" /> Properties
+                  {!propertiesLoading && (
+                    <span className="ml-1 bg-golden text-white text-xs font-bold px-2 py-0.5 rounded-full">{propertiesData.length}</span>
+                  )}
+                </h2>
+                {!showPropForm && (
+                  <button
+                    onClick={openAddForm}
+                    className="flex items-center gap-2 bg-golden hover:bg-golden-dark text-white text-sm font-bold px-4 py-2 rounded-full transition"
+                  >
+                    <Plus size={14} /> Add Property
+                  </button>
+                )}
+              </div>
+
+              {propertiesLoading ? (
+                <div className="p-14 flex items-center justify-center">
+                  <svg className="animate-spin h-7 w-7 text-golden" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                </div>
+              ) : propertiesData.length === 0 ? (
+                <div className="p-14 text-center">
+                  <Home size={36} className="text-gray-200 mx-auto mb-3" />
+                  <p className="text-gray-400 text-sm font-medium mb-1">No properties yet</p>
+                  <p className="text-gray-400 text-xs">Add your first property using the button above.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {propertiesData.map(p => (
+                    <div key={p.id} className="p-4 flex gap-4 hover:bg-gray-50/50 transition items-start">
+                      <div className="w-20 h-16 shrink-0 rounded-xl overflow-hidden bg-gray-100">
+                        {p.image && (
+                          <img src={p.image} alt={p.title} className="w-full h-full object-cover" loading="lazy" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-bold text-charcoal text-sm truncate">{p.title}</p>
+                            <p className="text-gray-400 text-xs mt-0.5">{p.location} · {p.type}</p>
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {(p.amenities || []).slice(0, 4).map(a => (
+                                <span key={a} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{a}</span>
+                              ))}
+                              {(p.amenities || []).length > 4 && (
+                                <span className="text-xs text-gray-400">+{p.amenities.length - 4} more</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-sm font-bold text-golden">₹{Number(p.price).toLocaleString('en-IN')}/night</span>
+                            <button
+                              onClick={() => handleEditProp(p)}
+                              className="p-2 text-gray-400 hover:text-golden hover:bg-golden/10 rounded-lg transition"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteProp(p.id)}
+                              disabled={deletingPropId === p.id}
+                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
+                              title="Delete"
+                            >
+                              {deletingPropId === p.id ? (
+                                <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                                </svg>
+                              ) : <Trash2 size={15} />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Channel Manager */}
         {activeTab === 'channels' && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
@@ -256,41 +621,45 @@ const OwnerDashboard = () => {
               <h2 className="font-bold text-charcoal text-base">Platform Sync Status</h2>
               <span className="ml-auto text-xs text-gray-400 bg-gray-50 border border-gray-200 px-3 py-1 rounded-full">UI preview — connect OTA API to enable live sync</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {properties.map(p => (
-                <div key={p.id} className="border border-gray-100 rounded-2xl overflow-hidden hover:shadow-md transition">
-                  <div className="relative h-28">
-                    <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/30" />
-                    <div className="absolute bottom-0 left-0 p-3">
-                      <p className="text-white font-bold text-xs leading-tight">{p.title}</p>
-                      <p className="text-white/70 text-xs">{p.city}</p>
+            {propertiesLoading ? (
+              <div className="h-20 flex items-center justify-center text-gray-400 text-sm">Loading…</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {propertiesData.map(p => (
+                  <div key={p.id} className="border border-gray-100 rounded-2xl overflow-hidden hover:shadow-md transition">
+                    <div className="relative h-28">
+                      <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/30" />
+                      <div className="absolute bottom-0 left-0 p-3">
+                        <p className="text-white font-bold text-xs leading-tight">{p.title}</p>
+                        <p className="text-white/70 text-xs">{p.city}</p>
+                      </div>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {[
+                        { key: 'airbnb', label: 'Airbnb', color: 'text-[#FF5A5F]' },
+                        { key: 'mmt', label: 'MakeMyTrip', color: 'text-[#E41F35]' },
+                        { key: 'goibibo', label: 'Goibibo', color: 'text-[#2274E0]' },
+                      ].map(({ key, label, color }) => (
+                        <div key={key} className="flex items-center justify-between">
+                          <span className={`text-xs font-bold ${color}`}>{label}</span>
+                          <button
+                            onClick={() => toggleChannel(p.id, key)}
+                            className="flex items-center gap-1.5 text-xs transition"
+                          >
+                            {channels[p.id]?.[key] ? (
+                              <><ToggleRight size={22} className="text-green-500" /><span className="text-green-600 font-medium">Active</span></>
+                            ) : (
+                              <><ToggleLeft size={22} className="text-gray-300" /><span className="text-gray-400 font-medium">Off</span></>
+                            )}
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  <div className="p-4 space-y-3">
-                    {[
-                      { key: 'airbnb', label: 'Airbnb', color: 'text-[#FF5A5F]' },
-                      { key: 'mmt', label: 'MakeMyTrip', color: 'text-[#E41F35]' },
-                      { key: 'goibibo', label: 'Goibibo', color: 'text-[#2274E0]' },
-                    ].map(({ key, label, color }) => (
-                      <div key={key} className="flex items-center justify-between">
-                        <span className={`text-xs font-bold ${color}`}>{label}</span>
-                        <button
-                          onClick={() => toggleChannel(p.id, key)}
-                          className="flex items-center gap-1.5 text-xs transition"
-                        >
-                          {channels[p.id]?.[key] ? (
-                            <><ToggleRight size={22} className="text-green-500" /><span className="text-green-600 font-medium">Active</span></>
-                          ) : (
-                            <><ToggleLeft size={22} className="text-gray-300" /><span className="text-gray-400 font-medium">Off</span></>
-                          )}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

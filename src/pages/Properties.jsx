@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
 import { useSearchParams } from 'react-router-dom';
-import { properties, cities } from '../data/properties';
+import { getProperties } from '../lib/properties';
 import PropertyCard from '../components/PropertyCard';
 import { X, MapPin } from 'lucide-react';
 
@@ -19,10 +19,25 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
 };
 
+const CAPACITY = { '2BHK': 6, '3BHK': 8, 'Villa': 12 };
+
 const Properties = () => {
+  const [allProperties, setAllProperties] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [loadingProps, setLoadingProps] = useState(true);
   const [activeFilter, setActiveFilter] = useState('All');
   const [activeCity, setActiveCity] = useState('All');
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    getProperties()
+      .then(data => {
+        setAllProperties(data);
+        setCities([...new Set(data.map(p => p.city))]);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingProps(false));
+  }, []);
 
   const locationQuery = searchParams.get('location') || '';
   const checkinQuery = searchParams.get('checkin') || '';
@@ -32,10 +47,9 @@ const Properties = () => {
 
   const clearSearch = () => { setSearchParams({}); setActiveCity('All'); };
 
-  const CAPACITY = { '2BHK': 6, '3BHK': 8, 'Villa': 12 };
   const guestCount = parseInt(guestsQuery, 10) || 0;
 
-  const filteredProperties = properties.filter(property => {
+  const filteredProperties = allProperties.filter(property => {
     const matchesType = activeFilter === 'All' || property.type === activeFilter;
     const matchesCity = activeCity === 'All' || property.city === activeCity;
     const matchesLocation = !locationQuery ||
@@ -142,46 +156,62 @@ const Properties = () => {
         )}
 
         {/* --- Property Grid --- */}
-        <motion.div
-          layout
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-12"
-        >
-          <AnimatePresence>
-            {filteredProperties.length > 0 ? (
-              filteredProperties.map((property) => (
+        {loadingProps ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-12">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm animate-pulse">
+                <div className="h-52 bg-gray-200" />
+                <div className="p-5 space-y-3">
+                  <div className="h-4 bg-gray-200 rounded w-3/4" />
+                  <div className="h-3 bg-gray-100 rounded w-1/2" />
+                  <div className="h-3 bg-gray-100 rounded w-1/3" />
+                  <div className="h-9 bg-gray-200 rounded-xl mt-4" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <motion.div
+            layout
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-12"
+          >
+            <AnimatePresence>
+              {filteredProperties.length > 0 ? (
+                filteredProperties.map((property) => (
+                  <motion.div
+                    layout
+                    key={property.id}
+                    variants={itemVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit={{ opacity: 0, scale: 0.9 }}
+                  >
+                    <PropertyCard property={property} />
+                  </motion.div>
+                ))
+              ) : (
                 <motion.div
-                  layout
-                  key={property.id}
-                  variants={itemVariants}
-                  initial="hidden"
-                  animate="visible"
-                  exit={{ opacity: 0, scale: 0.9 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="col-span-full text-center py-20"
                 >
-                  <PropertyCard property={property} />
+                  <h3 className="text-2xl text-gray-400 font-bold mb-2">No properties found.</h3>
+                  <p className="text-gray-400 mb-4">
+                    {locationQuery ? `We don't have listings in "${locationQuery}" yet.` : 'Try selecting a different category.'}
+                  </p>
+                  {hasSearchQuery && (
+                    <button onClick={clearSearch} className="text-golden font-bold underline">
+                      Clear search and view all
+                    </button>
+                  )}
                 </motion.div>
-              ))
-            ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="col-span-full text-center py-20"
-              >
-                <h3 className="text-2xl text-gray-400 font-bold mb-2">No properties found.</h3>
-                <p className="text-gray-400 mb-4">
-                  {locationQuery ? `We don't have listings in "${locationQuery}" yet.` : 'Try selecting a different category.'}
-                </p>
-                {hasSearchQuery && (
-                  <button onClick={clearSearch} className="text-golden font-bold underline">
-                    Clear search and view all
-                  </button>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
       </div>
     </div>
   );
