@@ -21,9 +21,12 @@ const PropertyCard = ({ property }) => {
       <div className="p-5">
         <div className="flex justify-between items-start mb-2">
           <h3 className="text-lg font-bold text-charcoal">{property.title}</h3>
-          <div className="flex items-center text-golden-dark font-semibold">
-            <Star size={16} className="fill-current mr-1" />
-            {property.rating}
+          <div className="flex items-center gap-1 text-golden-dark font-semibold shrink-0">
+            <Star size={14} className="fill-current" />
+            <span>{property.rating ?? '—'}</span>
+            {property.review_count > 0 && (
+              <span className="text-gray-400 font-normal text-xs">({property.review_count})</span>
+            )}
           </div>
         </div>
 

@@ -17,5 +17,16 @@ export const submitReview = async (review) => {
     .select()
     .single();
   if (error) throw error;
+
+  // Recompute avg rating and write back to the property
+  const { data: all } = await supabase
+    .from('reviews')
+    .select('rating')
+    .eq('property_id', review.property_id);
+  if (all?.length) {
+    const avg = Math.round((all.reduce((s, r) => s + r.rating, 0) / all.length) * 10) / 10;
+    await supabase.from('properties').update({ rating: avg, review_count: all.length }).eq('id', review.property_id);
+  }
+
   return data;
 };

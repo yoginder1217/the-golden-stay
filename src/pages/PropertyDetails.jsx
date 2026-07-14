@@ -10,6 +10,7 @@ import { StarPicker, StarDisplay } from '../components/StarRating';
 import { getPropertyReviews, submitReview } from '../lib/reviews';
 import { useAuth } from '../context/AuthContextUtils';
 import { getPropertyAvailability, hasDateConflict, getBlockedDates, hasBlockedConflict } from '../lib/availability';
+import AvailabilityCalendar from '../components/AvailabilityCalendar';
 
 const CLEANING_FEE = 500;
 const SERVICE_FEE = 300;
@@ -97,6 +98,19 @@ const PropertyDetails = () => {
   const handleCheckoutChange = (e) => {
     setCheckout(e.target.value);
     setDateError('');
+  };
+
+  const handleCalendarSelect = (iso) => {
+    setDateError('');
+    if (!checkin || (checkin && checkout)) {
+      setCheckin(iso);
+      setCheckout('');
+    } else if (iso > checkin) {
+      setCheckout(iso);
+    } else {
+      setCheckin(iso);
+      setCheckout('');
+    }
   };
 
   const handleBookDirect = () => {
@@ -196,34 +210,42 @@ const PropertyDetails = () => {
       </Helmet>
 
       {/* Image Gallery */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1 }}
-        className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 h-[50vh] md:h-[60vh] gap-1 md:gap-2 p-1 md:p-2"
-      >
-        <div className="md:col-span-2 md:row-span-2 overflow-hidden rounded-xl relative">
-          <img src={property.image} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" alt={property.title} loading="eager" />
-          <WishlistButton property={property} className="absolute top-3 left-3" />
-        </div>
-        <div className="overflow-hidden rounded-xl hidden md:block">
-          <img src="https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&q=80&w=600" className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" alt="Kitchen" loading="lazy" />
-        </div>
-        <div className="overflow-hidden rounded-xl hidden md:block">
-          <img src="https://images.unsplash.com/photo-1617325247661-675ab4b64ae2?auto=format&fit=crop&q=80&w=600" className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" alt="Bedroom" loading="lazy" />
-        </div>
-        <div className="overflow-hidden rounded-xl hidden md:block">
-          <img src="https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?auto=format&fit=crop&q=80&w=600" className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" alt="Living Room" loading="lazy" />
-        </div>
-        <div className="relative overflow-hidden rounded-xl hidden md:block">
-          <img src="https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&q=80&w=600" className="w-full h-full object-cover transition-transform duration-700" alt="Bathroom" loading="lazy" />
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <span className="text-white font-bold border border-white px-4 py-2 rounded-full backdrop-blur-sm text-sm">
-              +{property.amenities.length} Amenities
-            </span>
-          </div>
-        </div>
-      </motion.div>
+      {(() => {
+        const imgs = (property.images && property.images.length > 0)
+          ? property.images
+          : [
+              property.image,
+              'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&q=80&w=600',
+              'https://images.unsplash.com/photo-1617325247661-675ab4b64ae2?auto=format&fit=crop&q=80&w=600',
+              'https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?auto=format&fit=crop&q=80&w=600',
+              'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&q=80&w=600',
+            ];
+        return (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1 }}
+            className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 h-[50vh] md:h-[60vh] gap-1 md:gap-2 p-1 md:p-2"
+          >
+            <div className="md:col-span-2 md:row-span-2 overflow-hidden rounded-xl relative">
+              <img src={imgs[0]} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" alt={property.title} loading="eager" />
+              <WishlistButton property={property} className="absolute top-3 left-3" />
+            </div>
+            {[1, 2, 3, 4].map((idx) => imgs[idx] && (
+              <div key={idx} className={`overflow-hidden rounded-xl hidden md:block ${idx === 4 ? 'relative' : ''}`}>
+                <img src={imgs[idx]} className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" alt={`Photo ${idx + 1}`} loading="lazy" />
+                {idx === 4 && imgs.length > 5 && (
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                    <span className="text-white font-bold border border-white px-4 py-2 rounded-full backdrop-blur-sm text-sm">
+                      +{imgs.length - 5} more
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </motion.div>
+        );
+      })()}
 
       <div className="max-w-7xl mx-auto px-4 py-12 grid grid-cols-1 lg:grid-cols-3 gap-16">
 
@@ -499,6 +521,18 @@ const PropertyDetails = () => {
               <span>{nights > 0 ? `Reserve for ₹${total.toLocaleString('en-IN')}` : 'Book Direct (Best Price)'}</span>
               <ArrowRight size={18} />
             </button>
+
+            {/* Availability Calendar */}
+            <div className="mt-5 mb-2">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Availability</p>
+              <AvailabilityCalendar
+                bookedRanges={availability}
+                blockedRanges={blockedDates}
+                checkin={checkin}
+                checkout={checkout}
+                onSelectDate={handleCalendarSelect}
+              />
+            </div>
 
             <div className="flex items-center gap-3 my-4">
               <div className="flex-1 h-px bg-gray-200" />

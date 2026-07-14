@@ -29,7 +29,7 @@ const STATUS_COLORS = {
 
 const EMPTY_PROP_FORM = {
   title: '', type: '2BHK', city: '', location: '',
-  price: '', weekend_premium: 0, image: '', description: '',
+  price: '', weekend_premium: 0, image: '', images: [], description: '',
   amenities: '', airbnb: '', mmt: '', goibibo: '',
 };
 
@@ -176,6 +176,7 @@ const OwnerDashboard = () => {
       price: String(p.price),
       weekend_premium: p.weekend_premium || 0,
       image: p.image || '',
+      images: p.images || [],
       description: p.description || '',
       amenities: (p.amenities || []).join(', '),
       airbnb: p.links?.airbnb || '',
@@ -203,6 +204,7 @@ const OwnerDashboard = () => {
         price: parseInt(propForm.price, 10),
         weekend_premium: Math.round(propForm.weekend_premium) || 0,
         image: propForm.image.trim() || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=800',
+        images: propForm.images.filter(Boolean),
         description: propForm.description.trim(),
         amenities: propForm.amenities.split(',').map(s => s.trim()).filter(Boolean),
         links: {
@@ -668,6 +670,44 @@ const OwnerDashboard = () => {
                           {imageUploadError && <p className="text-red-500 text-xs">{imageUploadError}</p>}
                         </div>
                       </div>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>Additional Photos <span className="normal-case text-gray-400 font-normal">(gallery)</span></label>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {propForm.images.map((url, i) => (
+                          <div key={i} className="relative w-16 h-12 rounded-lg overflow-hidden border border-gray-200 group">
+                            <img src={url} alt="" className="w-full h-full object-cover" />
+                            <button type="button"
+                              onClick={() => setPropForm(f => ({ ...f, images: f.images.filter((_, j) => j !== i) }))}
+                              className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
+                            >
+                              <X size={12} className="text-white" />
+                            </button>
+                          </div>
+                        ))}
+                        <label className="w-16 h-12 border-2 border-dashed border-gray-200 hover:border-golden rounded-lg flex items-center justify-center cursor-pointer transition">
+                          {imageUploading ? (
+                            <svg className="animate-spin h-4 w-4 text-golden" viewBox="0 0 24 24" fill="none">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                            </svg>
+                          ) : <ImageIcon size={16} className="text-gray-300 group-hover:text-golden" />}
+                          <input type="file" accept="image/*" multiple className="sr-only" disabled={imageUploading}
+                            onChange={async (e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (!files.length) return;
+                              setImageUploading(true); setImageUploadError('');
+                              try {
+                                const urls = await Promise.all(files.map(f => uploadPropertyImage(f)));
+                                setPropForm(f => ({ ...f, images: [...f.images, ...urls] }));
+                              } catch (err) {
+                                setImageUploadError(err?.message || 'Upload failed.');
+                              } finally { setImageUploading(false); }
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <p className="text-xs text-gray-400">Upload up to 10 photos. First photo is the cover.</p>
                     </div>
                     <div className="sm:col-span-2">
                       <label className={labelCls}>Description</label>

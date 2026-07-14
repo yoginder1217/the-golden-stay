@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContextUtils';
 import { getUserBookings, cancelBooking } from '../lib/bookings';
 import BookingCard from '../components/BookingCard';
 import { Helmet } from 'react-helmet-async';
-import { Home, Calendar, User, LogOut, RefreshCw, Heart, Award, Settings, Bell, BellOff } from 'lucide-react';
+import { Home, Calendar, User, LogOut, RefreshCw, Heart, Award, Settings, Bell, BellOff, Star } from 'lucide-react';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
 const Dashboard = () => {
@@ -218,6 +218,40 @@ const Dashboard = () => {
             cta: true,
           }}
         />
+
+        {/* Review Prompts */}
+        {(() => {
+          const today2 = new Date();
+          const needsReview = past.filter(b =>
+            b.status !== 'cancelled' &&
+            new Date(b.checkout_date) <= today2 &&
+            !b.reviewed
+          ).slice(0, 3);
+          if (!needsReview.length) return null;
+          return (
+            <div className="bg-golden/5 border border-golden/20 rounded-2xl p-5 mb-6">
+              <h2 className="font-bold text-charcoal mb-3 flex items-center gap-2 text-base">
+                <Star size={16} className="text-golden fill-golden" /> Rate your recent stays
+              </h2>
+              <div className="space-y-3">
+                {needsReview.map(b => (
+                  <div key={b.id} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-golden/10">
+                    <div>
+                      <p className="font-bold text-charcoal text-sm">{b.property_title}</p>
+                      <p className="text-gray-400 text-xs">{new Date(b.checkout_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    </div>
+                    <Link
+                      to={`/property/${b.property_id}`}
+                      className="flex items-center gap-1.5 text-xs font-bold text-golden border border-golden px-3 py-1.5 rounded-full hover:bg-golden hover:text-white transition"
+                    >
+                      <Star size={12} /> Leave a Review
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Past Trips */}
         <BookingsSection
