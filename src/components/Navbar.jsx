@@ -54,12 +54,12 @@ const Navbar = () => {
     const fetchNotifs = () => getNotifications(user.id).then(setNotifications).catch(() => {});
     fetchNotifs();
 
-    // Realtime: fires when a new notification row is inserted
+    // Realtime: fire on any INSERT (personal or broadcast); data fetch is RLS-secured
     const channel = supabase
       .channel(`notif-${user.id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        { event: 'INSERT', schema: 'public', table: 'notifications' },
         () => fetchNotifs()
       )
       .subscribe();
