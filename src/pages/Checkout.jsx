@@ -165,7 +165,7 @@ const Checkout = () => {
           status: 'confirmed',
         });
 
-        // In-app notification
+        // In-app notification (non-blocking)
         createNotification({
           user_id: user.id,
           title: 'Booking Confirmed!',
@@ -189,22 +189,23 @@ const Checkout = () => {
             total: finalTotal,
             loyalty_discount: pointsDiscount,
           },
-        }).catch(() => {}); // fire-and-forget — don't block navigation
+        }).catch(() => {});
+
+        navigate('/booking-success', {
+          state: {
+            property, checkin, checkout, guests, nights,
+            total: finalTotal,
+            guestName: form.name,
+            guestEmail: form.email,
+            paymentId,
+            bookingId: bookingRef,
+            pointsRedeemed,
+          },
+        });
       } catch (err) {
         console.error('Booking save failed:', err.message);
+        alert('Your payment was received but booking could not be saved. Please contact support with payment ID: ' + paymentId);
       }
-
-      navigate('/booking-success', {
-        state: {
-          property, checkin, checkout, guests, nights,
-          total: finalTotal,
-          guestName: form.name,
-          guestEmail: form.email,
-          paymentId,
-          bookingId: bookingRef,
-          pointsRedeemed,
-        },
-      });
     };
 
     if (window.Razorpay) {
