@@ -54,7 +54,7 @@ const Navbar = () => {
     const fetchNotifs = () => getNotifications(user.id).then(setNotifications).catch(() => {});
     fetchNotifs();
 
-    // Realtime: fire on any INSERT (personal or broadcast); data fetch is RLS-secured
+    // Realtime: fire on any INSERT (personal or broadcast)
     const channel = supabase
       .channel(`notif-${user.id}`)
       .on(
@@ -64,12 +64,16 @@ const Navbar = () => {
       )
       .subscribe();
 
-    // Fallback: refetch when the tab regains focus
+    // Fallback 1: refetch when tab regains focus
     window.addEventListener('focus', fetchNotifs);
+
+    // Fallback 2: poll every 30s in case Realtime misses broadcasts
+    const poll = setInterval(fetchNotifs, 30000);
 
     return () => {
       supabase.removeChannel(channel);
       window.removeEventListener('focus', fetchNotifs);
+      clearInterval(poll);
     };
   }, [user]);
 
