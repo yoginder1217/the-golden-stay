@@ -4,7 +4,7 @@ export const getNotifications = async (userId) => {
   const { data, error } = await supabase
     .from('notifications')
     .select('*')
-    .eq('user_id', userId)
+    .or(`user_id.eq.${userId},user_id.is.null`)
     .order('created_at', { ascending: false })
     .limit(20);
   if (error) throw error;
@@ -12,6 +12,7 @@ export const getNotifications = async (userId) => {
 };
 
 export const markAllRead = async (userId) => {
+  // Only mark personal notifications — broadcasts are shared rows
   await supabase
     .from('notifications')
     .update({ read: true })

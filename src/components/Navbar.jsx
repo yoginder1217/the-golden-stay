@@ -28,10 +28,15 @@ const Navbar = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isBellOpen, setIsBellOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [broadcastSeen, setBroadcastSeen] = useState(() => {
+    try { return localStorage.getItem('broadcast_seen') || '1970-01-01'; } catch { return '1970-01-01'; }
+  });
   const bellRef = useRef(null);
 
   const closeMenu = () => { setIsMobileMenuOpen(false); setIsUserMenuOpen(false); };
-  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const isBroadcastUnread = (n) => n.user_id === null && new Date(n.created_at) > new Date(broadcastSeen);
+  const unreadCount = notifications.filter(n => n.user_id !== null ? !n.read : isBroadcastUnread(n)).length;
 
   const handleLogout = async () => {
     closeMenu();
@@ -81,10 +86,17 @@ const Navbar = () => {
     const opening = !isBellOpen;
     setIsBellOpen(opening);
     setIsUserMenuOpen(false);
-    if (opening && unreadCount > 0) {
-      markAllRead(user.id).then(() =>
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-      ).catch(() => {});
+    if (opening) {
+      // Mark personal notifications read
+      if (notifications.some(n => n.user_id !== null && !n.read)) {
+        markAllRead(user.id).then(() =>
+          setNotifications(prev => prev.map(n => n.user_id !== null ? { ...n, read: true } : n))
+        ).catch(() => {});
+      }
+      // Mark broadcasts seen via localStorage
+      const now = new Date().toISOString();
+      try { localStorage.setItem('broadcast_seen', now); } catch {}
+      setBroadcastSeen(now);
     }
   };
 
@@ -163,15 +175,15 @@ const Navbar = () => {
                           <button
                             key={n.id}
                             onClick={() => handleNotificationClick(n)}
-                            className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition flex gap-2 ${!n.read ? 'bg-golden/5' : ''}`}
+                            className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition flex gap-2 ${(n.user_id !== null ? !n.read : isBroadcastUnread(n)) ? 'bg-golden/5' : ''}`}
                           >
                             {typeIcon(n.type)}
                             <div className="flex-1 min-w-0">
-                              <p className={`text-sm leading-snug ${n.read ? 'text-gray-600' : 'font-semibold text-charcoal'}`}>{n.title}</p>
+                              <p className={`text-sm leading-snug ${(n.user_id !== null ? n.read : !isBroadcastUnread(n)) ? 'text-gray-600' : 'font-semibold text-charcoal'}`}>{n.title}</p>
                               <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
                               <p className="text-[11px] text-gray-400 mt-1">{formatTime(n.created_at)}</p>
                             </div>
-                            {!n.read && <span className="w-2 h-2 rounded-full bg-golden shrink-0 mt-1.5" />}
+                            {(n.user_id !== null ? !n.read : isBroadcastUnread(n)) && <span className="w-2 h-2 rounded-full bg-golden shrink-0 mt-1.5" />}
                           </button>
                         ))
                       )}
@@ -300,21 +312,24 @@ const Navbar = () => {
             {notifications.length === 0 ? (
               <p className="px-4 py-6 text-center text-gray-400 text-sm">No notifications yet</p>
             ) : (
-              notifications.map(n => (
-                <button
-                  key={n.id}
-                  onClick={() => handleNotificationClick(n)}
-                  className={`w-full text-left px-4 py-3 hover:bg-gray-50 flex gap-2 ${!n.read ? 'bg-golden/5' : ''}`}
-                >
-                  {typeIcon(n.type)}
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm leading-snug ${n.read ? 'text-gray-600' : 'font-semibold text-charcoal'}`}>{n.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
-                    <p className="text-[11px] text-gray-400 mt-1">{formatTime(n.created_at)}</p>
-                  </div>
-                  {!n.read && <span className="w-2 h-2 rounded-full bg-golden shrink-0 mt-1.5" />}
-                </button>
-              ))
+              notifications.map(n => {
+                const isUnread = n.user_id !== null ? !n.read : isBroadcastUnread(n);
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => handleNotificationClick(n)}
+                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 flex gap-2 ${isUnread ? 'bg-golden/5' : ''}`}
+                  >
+                    {typeIcon(n.type)}
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm leading-snug ${isUnread ? 'font-semibold text-charcoal' : 'text-gray-600'}`}>{n.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">{formatTime(n.created_at)}</p>
+                    </div>
+                    {isUnread && <span className="w-2 h-2 rounded-full bg-golden shrink-0 mt-1.5" />}
+                  </button>
+                );
+              })
             )}
           </div>
         </div>

@@ -221,16 +221,14 @@ const OwnerDashboard = () => {
       } else {
         const created = await createProperty(propertyData);
         setPropertiesData(prev => [...prev, created]);
-        // Notify admin of new listing
-        if (user?.id) {
-          createNotification({
-            user_id: user.id,
-            title: 'New Property Listed',
-            body: `"${created.title}" in ${created.location} is now live on The Golden Stay.`,
-            url: `/property/${created.id}`,
-            type: 'property',
-          }).catch(() => {});
-        }
+        // Broadcast to all users: user_id null = everyone sees it
+        createNotification({
+          user_id: null,
+          title: 'New Property Available!',
+          body: `"${created.title}" in ${created.location} is now live. Check it out!`,
+          url: `/property/${created.id}`,
+          type: 'property',
+        }).catch(() => {});
       }
       setShowPropForm(false);
       setEditingProp(null);
