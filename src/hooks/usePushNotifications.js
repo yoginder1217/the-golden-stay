@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
@@ -7,6 +8,20 @@ const urlBase64ToUint8Array = (base64String) => {
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+};
+
+const saveSubscription = async (sub) => {
+  const { endpoint, keys } = sub.toJSON();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('push_subscriptions').upsert(
+    { user_id: user.id, endpoint, p256dh: keys.p256dh, auth_key: keys.auth },
+    { onConflict: 'endpoint' }
+  );
+};
+
+const deleteSubscription = async (endpoint) => {
+  await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
 };
 
 export const usePushNotifications = () => {
@@ -23,9 +38,9 @@ export const usePushNotifications = () => {
 
   useEffect(() => {
     if (!supported) return;
-    navigator.serviceWorker.ready.then(reg => {
-      reg.pushManager.getSubscription().then(sub => setSubscribed(!!sub));
-    });
+    navigator.serviceWorker.ready.then(reg =>
+      reg.pushManager.getSubscription().then(sub => setSubscribed(!!sub))
+    );
   }, [supported]);
 
   const subscribe = async () => {
@@ -34,7 +49,7 @@ export const usePushNotifications = () => {
     try {
       const perm = await Notification.requestPermission();
       setPermission(perm);
-      if (perm !== 'granted') { setLoading(false); return; }
+      if (perm !== 'granted') return;
 
       const reg = await navigator.serviceWorker.ready;
       let sub = await reg.pushManager.getSubscription();
@@ -44,13 +59,14 @@ export const usePushNotifications = () => {
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         });
       }
-      setSubscribed(true);
-
-      // Show a local welcome notification immediately
-      reg.showNotification('The Golden Stay', {
-        body: 'You\'ll now receive booking updates and alerts.',
-        icon: '/favicon.png',
-      });
+      if (sub) {
+        await saveSubscription(sub);
+        setSubscribed(true);
+        reg.showNotification('The Golden Stay', {
+          body: "You'll now receive booking updates and alerts.",
+          icon: '/favicon.png',
+        });
+      }
     } catch {}
     finally { setLoading(false); }
   };
@@ -60,7 +76,10 @@ export const usePushNotifications = () => {
     try {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
-      if (sub) await sub.unsubscribe();
+      if (sub) {
+        await deleteSubscription(sub.endpoint);
+        await sub.unsubscribe();
+      }
       setSubscribed(false);
     } catch {}
     finally { setLoading(false); }
