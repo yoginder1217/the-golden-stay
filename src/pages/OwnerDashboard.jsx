@@ -585,9 +585,15 @@ const OwnerDashboard = () => {
                         onChange={e => setPropForm(f => ({ ...f, type: e.target.value }))}
                         className={inputCls}
                       >
+                        <option value="1BHK">1BHK</option>
                         <option value="2BHK">2BHK</option>
                         <option value="3BHK">3BHK</option>
                         <option value="Villa">Villa</option>
+                        <option value="Cottage">Cottage</option>
+                        <option value="Farmhouse">Farmhouse</option>
+                        <option value="Studio">Studio</option>
+                        <option value="Penthouse">Penthouse</option>
+                        <option value="Bungalow">Bungalow</option>
                       </select>
                     </div>
                     <div>
