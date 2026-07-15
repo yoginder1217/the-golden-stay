@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContextUtils';
 import { saveBooking, getUserBookings } from '../lib/bookings';
 import { supabase } from '../lib/supabase';
 import { validatePromoCode } from '../lib/promoCodes';
+import { createNotification } from '../lib/notifications';
 
 const formatDate = (dateStr) =>
   dateStr
@@ -163,6 +164,15 @@ const Checkout = () => {
           booking_ref: bookingRef,
           status: 'confirmed',
         });
+
+        // In-app notification
+        createNotification({
+          user_id: user.id,
+          title: 'Booking Confirmed!',
+          body: `Your stay at ${property.title} from ${checkin} to ${checkout} is confirmed.`,
+          url: '/dashboard',
+          type: 'booking',
+        }).catch(() => {});
 
         // Send confirmation email via Edge Function (non-blocking)
         supabase.functions.invoke('send-booking-email', {

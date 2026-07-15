@@ -6,6 +6,7 @@ import { getContactMessages } from '../lib/contact';
 import { getProperties, createProperty, updateProperty, deleteProperty, uploadPropertyImage } from '../lib/properties';
 import { getBlockedDates, addBlockedDate, removeBlockedDate } from '../lib/availability';
 import { supabase } from '../lib/supabase';
+import { createNotification } from '../lib/notifications';
 import {
   TrendingUp, Calendar, Home, CreditCard,
   Search, RefreshCw, BarChart2, Users,
@@ -220,6 +221,16 @@ const OwnerDashboard = () => {
       } else {
         const created = await createProperty(propertyData);
         setPropertiesData(prev => [...prev, created]);
+        // Notify admin of new listing
+        if (user?.id) {
+          createNotification({
+            user_id: user.id,
+            title: 'New Property Listed',
+            body: `"${created.title}" in ${created.location} is now live on The Golden Stay.`,
+            url: `/property/${created.id}`,
+            type: 'property',
+          }).catch(() => {});
+        }
       }
       setShowPropForm(false);
       setEditingProp(null);
