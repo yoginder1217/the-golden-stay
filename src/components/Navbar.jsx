@@ -46,18 +46,26 @@ const Navbar = () => {
   useEffect(() => {
     if (!user) { setNotifications([]); return; }
 
-    getNotifications(user.id).then(setNotifications).catch(() => {});
+    const fetchNotifs = () => getNotifications(user.id).then(setNotifications).catch(() => {});
+    fetchNotifs();
 
+    // Realtime: fires when a new notification row is inserted
     const channel = supabase
       .channel(`notif-${user.id}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
-        (payload) => setNotifications(prev => [payload.new, ...prev].slice(0, 20))
+        () => fetchNotifs()
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Fallback: refetch when the tab regains focus
+    window.addEventListener('focus', fetchNotifs);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('focus', fetchNotifs);
+    };
   }, [user]);
 
   // Close bell dropdown on outside click
