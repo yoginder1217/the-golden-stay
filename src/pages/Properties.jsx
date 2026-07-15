@@ -27,6 +27,7 @@ const Properties = () => {
   const [loadingProps, setLoadingProps] = useState(true);
   const [activeFilter, setActiveFilter] = useState('All');
   const [activeCity, setActiveCity] = useState('All');
+  const [showAllCities, setShowAllCities] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -124,8 +125,8 @@ const Properties = () => {
                 </button>
               ))}
             </div>
-            <div className="flex gap-2 overflow-x-auto p-1 scrollbar-hide">
-              {['All', ...cities].map((city) => (
+            <div className="flex gap-2 flex-wrap p-1">
+              {['All', ...(showAllCities ? cities : cities.slice(0, 5))].map((city) => (
                 <button
                   key={city}
                   onClick={() => setActiveCity(city)}
@@ -137,6 +138,14 @@ const Properties = () => {
                   {city !== 'All' && <MapPin size={10} />} {city === 'All' ? 'All Cities' : city}
                 </button>
               ))}
+              {cities.length > 5 && (
+                <button
+                  onClick={() => setShowAllCities(v => !v)}
+                  className="px-4 py-1.5 rounded-full text-xs font-medium border border-golden text-golden hover:bg-golden hover:text-white transition-all whitespace-nowrap"
+                >
+                  {showAllCities ? 'Show less' : `+${cities.length - 5} more`}
+                </button>
+              )}
             </div>
           </div>
 
