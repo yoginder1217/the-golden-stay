@@ -151,7 +151,7 @@ const Home = () => {
             initial="hidden"
             animate="visible"
             variants={fadeInUp}
-            className="text-4xl md:text-7xl font-bold text-white mb-6 leading-tight drop-shadow-lg"
+            className="text-5xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-[1.05] tracking-tight drop-shadow-lg"
           >
             {c('hero.title').split('\n').map((line, i, arr) => (
               <React.Fragment key={i}>{line}{i < arr.length - 1 && <br />}</React.Fragment>
@@ -162,7 +162,7 @@ const Home = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 1 }}
-            className="text-lg md:text-2xl text-gray-200 mb-10 font-light max-w-2xl mx-auto"
+            className="text-lg md:text-xl text-gray-300 mb-10 font-light max-w-xl mx-auto leading-relaxed"
           >
             {c('hero.subtitle')}
           </motion.p>
@@ -221,26 +221,38 @@ const Home = () => {
       </div>
 
       {/* --- ROYAL SERVICES SECTION --- */}
-      <div className="bg-white py-16 md:py-24">
+      <div className="bg-white py-24 md:py-32">
         <div className="max-w-7xl mx-auto px-4">
-          <motion.div 
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <p className="text-golden text-xs font-bold uppercase tracking-widest mb-3">Why Golden Stay</p>
+            <h2 className="text-4xl md:text-5xl font-bold text-charcoal tracking-tight">The Golden Standard</h2>
+            <div className="h-0.5 w-16 bg-golden mx-auto mt-5 rounded-full" />
+          </motion.div>
+          <motion.div
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
             variants={staggerContainer}
-            className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 text-center"
+            className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10"
           >
             {[
               { icon: Shield, k: 1 },
               { icon: Coffee, k: 2 },
               { icon: Wifi,   k: 3 },
             ].map(({ icon: Icon, k }) => (
-              <motion.div key={k} variants={fadeInUp} className="p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300 border border-transparent hover:border-golden/20 group">
-                <div className="w-16 h-16 mx-auto bg-golden/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-golden group-hover:text-white transition-colors duration-300 text-golden-dark">
-                  <Icon size={32} />
+              <motion.div key={k} variants={fadeInUp}
+                className="group p-10 rounded-3xl bg-gray-50 hover:bg-white hover:shadow-2xl transition-all duration-300 border border-transparent hover:border-golden/20 text-center"
+              >
+                <div className="w-16 h-16 mx-auto bg-golden/10 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-golden group-hover:text-white transition-all duration-300 text-golden-dark">
+                  <Icon size={28} />
                 </div>
-                <h3 className="text-xl md:text-2xl font-bold mb-4 text-charcoal">{c(`services.${k}.title`)}</h3>
-                <p className="text-gray-600 text-sm md:text-base">{c(`services.${k}.desc`)}</p>
+                <h3 className="text-xl font-bold mb-3 text-charcoal tracking-tight">{c(`services.${k}.title`)}</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">{c(`services.${k}.desc`)}</p>
               </motion.div>
             ))}
           </motion.div>
@@ -248,22 +260,24 @@ const Home = () => {
       </div>
 
       {/* --- FEATURED PROPERTIES --- */}
-      <div className="bg-gray-50 py-16 md:py-24 relative">
-        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-golden to-transparent opacity-30"></div>
-        
+      <div className="bg-gray-50 py-24 md:py-32 relative">
+        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-golden to-transparent opacity-40" />
+
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
-            <motion.div 
-              initial={{ opacity: 0, x: -50 }}
+          <div className="flex flex-col md:flex-row justify-between items-end mb-14 gap-4">
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
+              transition={{ duration: 0.7 }}
             >
-              <h2 className="text-3xl md:text-5xl font-bold text-charcoal mb-2">The Collection</h2>
-              <p className="text-gray-500 text-base md:text-lg">Curated stays for the discerning traveler.</p>
+              <p className="text-golden text-xs font-bold uppercase tracking-widest mb-3">Handpicked Stays</p>
+              <h2 className="text-4xl md:text-6xl font-bold text-charcoal tracking-tight leading-none">The Collection</h2>
+              <p className="text-gray-400 text-base mt-3">Curated stays for the discerning traveler.</p>
             </motion.div>
-            <Link to="/properties" className="hidden md:flex items-center gap-2 text-golden-dark font-bold hover:text-golden transition tracking-wide uppercase text-sm border-b-2 border-transparent hover:border-golden pb-1">
-              View All Suites <ArrowRight size={18} />
+            <Link to="/properties" className="hidden md:flex items-center gap-2 text-sm font-bold text-charcoal hover:text-golden transition group">
+              View all properties
+              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
 
@@ -290,16 +304,17 @@ const Home = () => {
       </div>
 
       {/* --- EXPLORE BY CITY --- */}
-      <div className="bg-white py-16 md:py-24">
+      <div className="bg-white py-24 md:py-32">
         <div className="max-w-7xl mx-auto px-4">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-center mb-12"
+            className="text-center mb-14"
           >
-            <h2 className="text-3xl md:text-5xl font-bold text-charcoal mb-3">Explore by City</h2>
-            <p className="text-gray-500 text-lg">Premium stays across India's finest destinations.</p>
+            <p className="text-golden text-xs font-bold uppercase tracking-widest mb-3">Destinations</p>
+            <h2 className="text-4xl md:text-5xl font-bold text-charcoal tracking-tight">Explore by City</h2>
+            <p className="text-gray-400 text-base mt-3">Premium stays across India's finest destinations.</p>
           </motion.div>
 
           <motion.div
@@ -320,13 +335,14 @@ const Home = () => {
               <motion.div key={city} variants={fadeInUp}>
                 <Link
                   to={`/properties?location=${city}`}
-                  className="group block relative h-36 md:h-44 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300"
+                  className="group block relative h-40 md:h-48 rounded-2xl overflow-hidden shadow-md hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
                 >
                   <img src={img} alt={city} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-3">
-                    <p className="text-white font-bold text-sm">{city}</p>
-                    <p className="text-white/70 text-xs">{count} property</p>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                  <div className="absolute inset-0 bg-golden/0 group-hover:bg-golden/10 transition-colors duration-300" />
+                  <div className="absolute bottom-0 left-0 right-0 p-4">
+                    <p className="text-white font-bold text-sm tracking-wide">{city}</p>
+                    <p className="text-white/60 text-xs mt-0.5">{count} {count === 1 ? 'property' : 'properties'}</p>
                   </div>
                 </Link>
               </motion.div>
