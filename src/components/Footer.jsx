@@ -36,7 +36,7 @@ const Footer = () => {
           <h4 className="text-lg font-bold mb-4 font-serif">Contact</h4>
           <div className="space-y-2 text-gray-400 text-sm">
             <p>Khair, Aligarh, Uttar Pradesh</p>
-            <p>Phone: <a href="tel:+919876543210" className="hover:text-golden transition">+91 98765 43210</a></p>
+            <p>Phone: <a href="tel:+917983914058" className="hover:text-golden transition">+91 79839 14058</a></p>
             <p>Email: <a href="mailto:info@goldenstay.com" className="hover:text-golden transition">info@goldenstay.com</a></p>
           </div>
         </div>
