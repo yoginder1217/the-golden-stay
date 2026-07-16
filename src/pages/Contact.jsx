@@ -3,8 +3,10 @@ import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Facebook, Instagram, Twitter, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { saveContactMessage } from '../lib/contact';
+import { useSiteContent } from '../context/SiteContentContext';
 
 const Contact = () => {
+  const { c } = useSiteContent();
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', message: '' });
   const [status, setStatus] = useState('idle'); // idle, sending, success, error
 
@@ -50,9 +52,13 @@ const Contact = () => {
             transition={{ duration: 0.6 }}
           >
             <h4 className="text-golden font-bold uppercase tracking-widest mb-2">Get in Touch</h4>
-            <h1 className="text-4xl md:text-5xl font-bold mb-8 font-serif">Let's Plan Your <br/>Royal Stay.</h1>
+            <h1 className="text-4xl md:text-5xl font-bold mb-8 font-serif">
+              {c('contact.hero.title').split('\n').map((line, i, arr) => (
+                <React.Fragment key={i}>{line}{i < arr.length - 1 && <br />}</React.Fragment>
+              ))}
+            </h1>
             <p className="text-gray-400 mb-12 text-lg">
-              Have questions about booking a 3BHK for your next family trip? Reach out to our concierge team directly.
+              {c('contact.hero.subtitle')}
             </p>
 
             <div className="space-y-8">
@@ -62,8 +68,8 @@ const Contact = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg">Call Us</h3>
-                  <p className="text-gray-300 text-lg">+91 79839 14058</p>
-                  <p className="text-sm text-gray-500">Mon-Sun 9am to 8pm</p>
+                  <p className="text-gray-300 text-lg">{c('contact.phone')}</p>
+                  <p className="text-sm text-gray-500">{c('contact.hours')}</p>
                 </div>
               </div>
 
@@ -73,7 +79,7 @@ const Contact = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg">Email Us</h3>
-                  <p className="text-gray-300 text-lg">concierge@goldenstay.com</p>
+                  <p className="text-gray-300 text-lg">{c('contact.email')}</p>
                 </div>
               </div>
 
@@ -83,7 +89,7 @@ const Contact = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg">Visit HQ</h3>
-                  <p className="text-gray-300 text-lg">Khair, Aligarh, UP</p>
+                  <p className="text-gray-300 text-lg">{c('contact.address')}</p>
                 </div>
               </div>
             </div>

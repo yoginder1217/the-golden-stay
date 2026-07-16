@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-
-const questions = [
-  { q: "Is the kitchen fully equipped?", a: "Yes! All our 2BHK and 3BHK units come with a stove, gas, utensils, and a refrigerator." },
-  { q: "Are unmarried couples allowed?", a: "We welcome families and couples. Please provide valid ID proofs for all adults during check-in." },
-  { q: "Is there parking available?", a: "Yes, all our properties have dedicated parking spots for guests." }
-];
+import { useSiteContent } from '../context/SiteContentContext';
 
 const FAQ = () => {
+  const { cJSON } = useSiteContent();
+  const questions = cJSON('faq.items');
   const [openIndex, setOpenIndex] = useState(null);
 
   return (
@@ -16,7 +13,7 @@ const FAQ = () => {
       <div className="space-y-4">
         {questions.map((item, index) => (
           <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
-            <button 
+            <button
               className="w-full flex justify-between items-center p-4 bg-white hover:bg-gray-50 text-left font-semibold"
               onClick={() => setOpenIndex(openIndex === index ? null : index)}
             >

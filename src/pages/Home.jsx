@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { subscribeNewsletter } from '../lib/newsletter';
+import { useSiteContent } from '../context/SiteContentContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, ArrowRight, Star, Shield, Coffee, Wifi } from 'lucide-react';
@@ -96,6 +97,7 @@ const staggerContainer = {
 
 const Home = () => {
   const navigate = useNavigate();
+  const { c } = useSiteContent();
   const today = new Date().toISOString().split('T')[0];
 
   const [search, setSearch] = useState({ location: '', checkin: '', guests: '2 Adults, 1 Child' });
@@ -142,7 +144,7 @@ const Home = () => {
             transition={{ delay: 0.2 }}
             className="inline-block py-1 px-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-golden-light text-xs md:text-sm font-bold tracking-widest uppercase mb-4"
           >
-            Welcome to The Golden Stay
+            {c('hero.badge')}
           </motion.span>
           
           <motion.h1 
@@ -151,17 +153,18 @@ const Home = () => {
             variants={fadeInUp}
             className="text-4xl md:text-7xl font-bold text-white mb-6 leading-tight drop-shadow-lg"
           >
-            Experience <span className="text-transparent bg-clip-text bg-gradient-to-r from-golden-light via-yellow-200 to-golden-light">Royalty</span> <br /> 
-            Like Never Before
+            {c('hero.title').split('\n').map((line, i, arr) => (
+              <React.Fragment key={i}>{line}{i < arr.length - 1 && <br />}</React.Fragment>
+            ))}
           </motion.h1>
-          
-          <motion.p 
+
+          <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 1 }}
             className="text-lg md:text-2xl text-gray-200 mb-10 font-light max-w-2xl mx-auto"
           >
-            Premium 2BHK & 3BHK sanctuaries designed for families who demand excellence.
+            {c('hero.subtitle')}
           </motion.p>
 
           {/* Glassmorphism Search Bar - RESPONSIVE FIX */}
@@ -227,29 +230,19 @@ const Home = () => {
             variants={staggerContainer}
             className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 text-center"
           >
-            <motion.div variants={fadeInUp} className="p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300 border border-transparent hover:border-golden/20 group">
-              <div className="w-16 h-16 mx-auto bg-golden/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-golden group-hover:text-white transition-colors duration-300 text-golden-dark">
-                <Shield size={32} />
-              </div>
-              <h3 className="text-xl md:text-2xl font-bold mb-4 text-charcoal">Secure Sanctuaries</h3>
-              <p className="text-gray-600 text-sm md:text-base">24/7 Gated security and premium neighborhoods ensure your family sleeps with total peace of mind.</p>
-            </motion.div>
-
-            <motion.div variants={fadeInUp} className="p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300 border border-transparent hover:border-golden/20 group">
-              <div className="w-16 h-16 mx-auto bg-golden/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-golden group-hover:text-white transition-colors duration-300 text-golden-dark">
-                <Coffee size={32} />
-              </div>
-              <h3 className="text-xl md:text-2xl font-bold mb-4 text-charcoal">Chef's Kitchen</h3>
-              <p className="text-gray-600 text-sm md:text-base">Why eat out? Our fully equipped modular kitchens let you cook your family's favorite healthy meals.</p>
-            </motion.div>
-
-            <motion.div variants={fadeInUp} className="p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300 border border-transparent hover:border-golden/20 group">
-              <div className="w-16 h-16 mx-auto bg-golden/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-golden group-hover:text-white transition-colors duration-300 text-golden-dark">
-                <Wifi size={32} />
-              </div>
-              <h3 className="text-xl md:text-2xl font-bold mb-4 text-charcoal">Hyper-Connected</h3>
-              <p className="text-gray-600 text-sm md:text-base">Blazing fast 5G WiFi and Smart TVs in every room. Work, play, and stream without buffering.</p>
-            </motion.div>
+            {[
+              { icon: Shield, k: 1 },
+              { icon: Coffee, k: 2 },
+              { icon: Wifi,   k: 3 },
+            ].map(({ icon: Icon, k }) => (
+              <motion.div key={k} variants={fadeInUp} className="p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300 border border-transparent hover:border-golden/20 group">
+                <div className="w-16 h-16 mx-auto bg-golden/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-golden group-hover:text-white transition-colors duration-300 text-golden-dark">
+                  <Icon size={32} />
+                </div>
+                <h3 className="text-xl md:text-2xl font-bold mb-4 text-charcoal">{c(`services.${k}.title`)}</h3>
+                <p className="text-gray-600 text-sm md:text-base">{c(`services.${k}.desc`)}</p>
+              </motion.div>
+            ))}
           </motion.div>
         </div>
       </div>

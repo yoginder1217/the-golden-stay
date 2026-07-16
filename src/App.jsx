@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthProvider';
+import { SiteContentProvider } from './context/SiteContentContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/ScrollToTop';
 import Navbar from './components/Navbar';
@@ -89,6 +90,7 @@ function RoutedMain() {
 function App() {
   return (
     <AuthProvider>
+      <SiteContentProvider>
       <Router>
         <ScrollToTop />
         <div className="flex flex-col min-h-screen font-sans text-charcoal relative">
@@ -98,6 +100,7 @@ function App() {
           <WhatsAppButton />
         </div>
       </Router>
+      </SiteContentProvider>
     </AuthProvider>
   );
 }

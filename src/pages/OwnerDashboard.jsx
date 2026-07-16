@@ -8,13 +8,15 @@ import { getBlockedDates, addBlockedDate, removeBlockedDate } from '../lib/avail
 import { supabase } from '../lib/supabase';
 import { createNotification } from '../lib/notifications';
 import { getAllQA, answerQuestion } from '../lib/qa';
+import { saveSiteContentBatch, CONTENT_DEFAULTS } from '../lib/siteContent';
+import { useSiteContent } from '../context/SiteContentContext';
 import {
   TrendingUp, Calendar, Home, CreditCard,
   Search, RefreshCw, BarChart2, Users,
   Globe, ToggleLeft, ToggleRight, Mail,
   ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X,
   Download, Reply, CalendarX, Upload, ImageIcon,
-  HelpCircle, Tag, Zap, CheckCircle,
+  HelpCircle, Tag, Zap, CheckCircle, FileText, Save, PlusCircle,
 } from 'lucide-react';
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
@@ -90,6 +92,20 @@ const OwnerDashboard = () => {
   const [qaLoading, setQaLoading] = useState(false);
   const [qaAnswerMap, setQaAnswerMap] = useState({});
   const [qaAnsweringId, setQaAnsweringId] = useState(null);
+
+  // Content CMS tab
+  const { c, cJSON, setContent: setLiveContent, contentMap } = useSiteContent();
+  const [draft, setDraft] = useState({});
+  const [contentSaving, setContentSaving] = useState('');
+  const [contentSaved, setContentSaved] = useState('');
+
+  // Sync draft when contentMap loads or tab opens
+  useEffect(() => {
+    if (activeTab === 'content') {
+      const merged = { ...CONTENT_DEFAULTS, ...contentMap };
+      setDraft(merged);
+    }
+  }, [activeTab, contentMap]);
 
   // Channel manager: per-property platform toggles
   const [channels, setChannels] = useState({});
@@ -182,6 +198,27 @@ const OwnerDashboard = () => {
       setQaAnsweringId(null);
     }
   };
+
+  const saveContentSection = async (sectionId, keys, sectionLabel) => {
+    setContentSaving(sectionId);
+    try {
+      const entries = keys.map(key => ({ key, value: draft[key] ?? CONTENT_DEFAULTS[key] ?? '', section: sectionId, label: key }));
+      await saveSiteContentBatch(entries);
+      entries.forEach(({ key, value }) => setLiveContent(key, value));
+      setContentSaved(sectionId);
+      setTimeout(() => setContentSaved(''), 2500);
+    } catch (err) {
+      alert('Save failed: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setContentSaving('');
+    }
+  };
+
+  // Helper for JSON array fields in Content tab
+  const draftJSON = (key) => {
+    try { return JSON.parse(draft[key] ?? CONTENT_DEFAULTS[key] ?? '[]'); } catch { return []; }
+  };
+  const setDraftJSON = (key, arr) => setDraft(d => ({ ...d, [key]: JSON.stringify(arr) }));
 
   const toggleChannel = (propertyId, platform) => {
     setChannels(prev => ({
@@ -467,6 +504,7 @@ const OwnerDashboard = () => {
     { id: 'messages', label: `Messages${messages.length ? ` (${messages.length})` : ''}`, icon: Mail },
     { id: 'channels', label: 'Channel Manager', icon: Globe },
     { id: 'promos', label: 'Promo Codes', icon: CreditCard },
+    { id: 'content', label: 'Site Content', icon: FileText },
   ];
 
   const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-golden/40';
@@ -1420,6 +1458,210 @@ const OwnerDashboard = () => {
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── SITE CONTENT CMS ── */}
+        {activeTab === 'content' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <FileText size={16} className="text-golden" />
+                <h2 className="font-bold text-charcoal text-base">Site Content Manager</h2>
+              </div>
+              <p className="text-xs text-gray-400">Edit any text on the site here. Changes go live instantly — no redeploy needed.</p>
+            </div>
+
+            {/* Helper: save button */}
+            {(() => {
+              const SaveBtn = ({ sectionId, keys, label }) => (
+                <button
+                  onClick={() => saveContentSection(sectionId, keys, label)}
+                  disabled={!!contentSaving}
+                  className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm transition disabled:opacity-60 ${
+                    contentSaved === sectionId
+                      ? 'bg-green-500 text-white'
+                      : 'bg-golden hover:bg-golden-dark text-white'
+                  }`}
+                >
+                  {contentSaving === sectionId
+                    ? <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Saving…</>
+                    : contentSaved === sectionId
+                    ? <><CheckCircle size={15} /> Saved!</>
+                    : <><Save size={15} /> Save {label}</>}
+                </button>
+              );
+
+              const F = ({ label: lbl, k, rows = 1 }) => (
+                <div>
+                  <label className={labelCls}>{lbl}</label>
+                  {rows === 1
+                    ? <input value={draft[k] ?? ''} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))} className={inputCls} />
+                    : <textarea rows={rows} value={draft[k] ?? ''} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))} className={inputCls + ' resize-none'} />}
+                </div>
+              );
+
+              return (
+                <>
+                  {/* ── Hero ── */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                    <h3 className="font-bold text-charcoal flex items-center gap-2"><span className="text-golden text-lg">①</span> Home — Hero Section</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <F label="Badge Text" k="hero.badge" />
+                      <div />
+                      <F label="Title (use \\n for line break)" k="hero.title" rows={2} />
+                      <F label="Subtitle" k="hero.subtitle" rows={2} />
+                    </div>
+                    <SaveBtn sectionId="hero" keys={['hero.badge','hero.title','hero.subtitle']} label="Hero" />
+                  </div>
+
+                  {/* ── Services / Feature Cards ── */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                    <h3 className="font-bold text-charcoal flex items-center gap-2"><span className="text-golden text-lg">②</span> Home — Feature Cards</h3>
+                    {[1,2,3].map(n => (
+                      <div key={n} className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-4 border-b border-gray-50 last:border-0 last:pb-0">
+                        <div className="sm:col-span-1">
+                          <F label={`Card ${n} — Title`} k={`services.${n}.title`} />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <F label={`Card ${n} — Description`} k={`services.${n}.desc`} rows={2} />
+                        </div>
+                      </div>
+                    ))}
+                    <SaveBtn sectionId="services" keys={['services.1.title','services.1.desc','services.2.title','services.2.desc','services.3.title','services.3.desc']} label="Services" />
+                  </div>
+
+                  {/* ── FAQ ── */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                    <h3 className="font-bold text-charcoal flex items-center gap-2"><span className="text-golden text-lg">③</span> Home — FAQ</h3>
+                    {draftJSON('faq.items').map((item, i) => (
+                      <div key={i} className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-4 border-b border-gray-50 last:border-0 last:pb-0">
+                        <div>
+                          <label className={labelCls}>Question {i+1}</label>
+                          <input value={item.q} onChange={e => {
+                            const arr = draftJSON('faq.items');
+                            arr[i] = { ...arr[i], q: e.target.value };
+                            setDraftJSON('faq.items', arr);
+                          }} className={inputCls} />
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <label className={labelCls}>Answer {i+1}</label>
+                            <textarea rows={2} value={item.a} onChange={e => {
+                              const arr = draftJSON('faq.items');
+                              arr[i] = { ...arr[i], a: e.target.value };
+                              setDraftJSON('faq.items', arr);
+                            }} className={inputCls + ' resize-none'} />
+                          </div>
+                          <button onClick={() => {
+                            const arr = draftJSON('faq.items').filter((_, j) => j !== i);
+                            setDraftJSON('faq.items', arr);
+                          }} className="mt-5 p-2 text-red-400 hover:text-red-600 transition self-start">
+                            <X size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <button onClick={() => {
+                      const arr = draftJSON('faq.items');
+                      arr.push({ q: 'New question?', a: 'Answer here.' });
+                      setDraftJSON('faq.items', arr);
+                    }} className="flex items-center gap-2 text-sm text-golden font-bold hover:underline">
+                      <PlusCircle size={15} /> Add Question
+                    </button>
+                    <SaveBtn sectionId="faq" keys={['faq.items']} label="FAQ" />
+                  </div>
+
+                  {/* ── About Page ── */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                    <h3 className="font-bold text-charcoal flex items-center gap-2"><span className="text-golden text-lg">④</span> About Page</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <F label="Hero Title" k="about.hero.title" />
+                      <F label="Hero Subtitle" k="about.hero.subtitle" rows={2} />
+                      <F label="Story Eyebrow" k="about.story.eyebrow" />
+                      <F label="Story Title" k="about.story.title" />
+                      <F label="Story Paragraph 1" k="about.story.p1" rows={3} />
+                      <F label="Story Paragraph 2" k="about.story.p2" rows={3} />
+                      <F label="Award Text" k="about.award.text" />
+                      <F label="Award Source" k="about.award.source" />
+                    </div>
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mt-2">Stats Bar (4 items)</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {draftJSON('about.stats').map((s, i) => (
+                        <div key={i} className="space-y-2">
+                          <div>
+                            <label className={labelCls}>Value {i+1}</label>
+                            <input value={s.value} onChange={e => {
+                              const arr = draftJSON('about.stats');
+                              arr[i] = { ...arr[i], value: e.target.value };
+                              setDraftJSON('about.stats', arr);
+                            }} className={inputCls} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Label {i+1}</label>
+                            <input value={s.label} onChange={e => {
+                              const arr = draftJSON('about.stats');
+                              arr[i] = { ...arr[i], label: e.target.value };
+                              setDraftJSON('about.stats', arr);
+                            }} className={inputCls} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mt-2">Core Values (3 cards)</p>
+                    {draftJSON('about.values').map((v, i) => (
+                      <div key={i} className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-3 border-b border-gray-50 last:border-0 last:pb-0">
+                        <div>
+                          <label className={labelCls}>Value {i+1} Title</label>
+                          <input value={v.title} onChange={e => {
+                            const arr = draftJSON('about.values');
+                            arr[i] = { ...arr[i], title: e.target.value };
+                            setDraftJSON('about.values', arr);
+                          }} className={inputCls} />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className={labelCls}>Value {i+1} Description</label>
+                          <textarea rows={2} value={v.desc} onChange={e => {
+                            const arr = draftJSON('about.values');
+                            arr[i] = { ...arr[i], desc: e.target.value };
+                            setDraftJSON('about.values', arr);
+                          }} className={inputCls + ' resize-none'} />
+                        </div>
+                      </div>
+                    ))}
+                    <SaveBtn sectionId="about" keys={['about.hero.title','about.hero.subtitle','about.story.eyebrow','about.story.title','about.story.p1','about.story.p2','about.award.text','about.award.source','about.stats','about.values']} label="About" />
+                  </div>
+
+                  {/* ── Contact Info ── */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                    <h3 className="font-bold text-charcoal flex items-center gap-2"><span className="text-golden text-lg">⑤</span> Contact Info</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <F label="Phone Number" k="contact.phone" />
+                      <F label="Email Address" k="contact.email" />
+                      <F label="Office Address" k="contact.address" />
+                      <F label="Office Hours" k="contact.hours" />
+                      <F label="Page Hero Title (use \\n for line break)" k="contact.hero.title" rows={2} />
+                      <F label="Page Hero Subtitle" k="contact.hero.subtitle" rows={2} />
+                    </div>
+                    <SaveBtn sectionId="contact" keys={['contact.phone','contact.email','contact.address','contact.hours','contact.hero.title','contact.hero.subtitle']} label="Contact" />
+                  </div>
+
+                  {/* ── Footer ── */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                    <h3 className="font-bold text-charcoal flex items-center gap-2"><span className="text-golden text-lg">⑥</span> Footer</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <F label="Tagline / About Blurb" k="footer.tagline" rows={2} />
+                      <div className="space-y-4">
+                        <F label="Footer Email" k="footer.email" />
+                        <F label="Footer Address" k="footer.address" />
+                        <F label="Copyright Text" k="footer.copyright" />
+                      </div>
+                    </div>
+                    <SaveBtn sectionId="footer" keys={['footer.tagline','footer.email','footer.address','footer.copyright']} label="Footer" />
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
 
