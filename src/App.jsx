@@ -27,6 +27,7 @@ import OwnerDashboard from './pages/OwnerDashboard';
 import Wishlist from './pages/Wishlist';
 import Profile from './pages/Profile';
 import RefundPolicy from './pages/RefundPolicy';
+import Rewards from './pages/Rewards';
 
 function RoutedMain() {
   const location = useLocation();
@@ -70,6 +71,11 @@ function RoutedMain() {
               <Route path="/profile" element={
                 <ProtectedRoute>
                   <Profile />
+                </ProtectedRoute>
+              } />
+              <Route path="/rewards" element={
+                <ProtectedRoute>
+                  <Rewards />
                 </ProtectedRoute>
               } />
 

@@ -13,8 +13,15 @@ const PropertyCard = ({ property }) => {
           className="w-full h-full object-cover"
         />
         <div className="absolute top-4 right-4 bg-white px-2 py-1 rounded-lg text-sm font-bold shadow-sm">
-          ₹{property.price}/night
+          {property.is_featured && property.discount_percent > 0
+            ? <><span className="line-through text-gray-400 mr-1 text-xs">₹{property.price}</span>₹{Math.round(property.price * (1 - property.discount_percent / 100))}</>
+            : `₹${property.price.toLocaleString('en-IN')}`}/night
         </div>
+        {property.is_featured && property.discount_percent > 0 && (
+          <div className="absolute top-4 left-12 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-sm">
+            {property.deal_label || `${property.discount_percent}% OFF`}
+          </div>
+        )}
         <WishlistButton property={property} className="absolute top-4 left-4" />
       </div>
 

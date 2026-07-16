@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getPropertyById } from '../lib/properties';
+import { getPropertyById, getProperties } from '../lib/properties';
 import { calculateDynamicPricing } from '../lib/pricing';
-import { Wifi, Home, Star, MapPin, CheckCircle, ExternalLink, ArrowRight, Users, Calendar, MessageSquare, LogIn } from 'lucide-react';
+import { Wifi, Home, Star, MapPin, CheckCircle, ExternalLink, ArrowRight, Users, Calendar, MessageSquare, LogIn, Share2, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { getPropertyQA, askQuestion } from '../lib/qa';
 import { Helmet } from 'react-helmet-async';
 import WishlistButton from '../components/WishlistButton';
 import { StarPicker, StarDisplay } from '../components/StarRating';
@@ -27,6 +28,7 @@ const PropertyDetails = () => {
 
   const [property, setProperty] = useState(null);
   const [propLoading, setPropLoading] = useState(true);
+  const [similarProperties, setSimilarProperties] = useState([]);
 
   useEffect(() => {
     setPropLoading(true);
@@ -35,6 +37,22 @@ const PropertyDetails = () => {
       .catch(() => setProperty(null))
       .finally(() => setPropLoading(false));
   }, [id]);
+
+  // Track recently viewed + load similar properties
+  useEffect(() => {
+    if (!property) return;
+    // Recently viewed tracking
+    try {
+      const prev = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
+      const updated = [property.id, ...prev.filter(x => x !== property.id)].slice(0, 5);
+      localStorage.setItem('recentlyViewed', JSON.stringify(updated));
+    } catch {}
+    // Similar properties from same city
+    getProperties().then(all => {
+      const similar = all.filter(p => p.id !== property.id && p.city === property.city).slice(0, 3);
+      setSimilarProperties(similar.length >= 2 ? similar : all.filter(p => p.id !== property.id).slice(0, 3));
+    }).catch(() => {});
+  }, [property]);
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -61,12 +79,21 @@ const PropertyDetails = () => {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState(false);
 
+  // Q&A state
+  const [qaList, setQaList] = useState([]);
+  const [qaQuestion, setQaQuestion] = useState('');
+  const [qaSubmitting, setQaSubmitting] = useState(false);
+  const [qaError, setQaError] = useState('');
+  const [qaSuccess, setQaSuccess] = useState(false);
+  const [showAllQA, setShowAllQA] = useState(false);
+
   useEffect(() => {
     if (property?.id) {
       getPropertyReviews(property.id)
         .then(setReviews)
         .catch(() => {})
         .finally(() => setReviewsLoading(false));
+      getPropertyQA(property.id).then(setQaList).catch(() => {});
     }
   }, [property?.id]);
 
@@ -260,9 +287,19 @@ const PropertyDetails = () => {
           <div className="flex justify-between items-start mb-6">
             <div>
               <h1 className="text-4xl font-bold text-charcoal mb-2 font-serif">{property.title}</h1>
-              <p className="text-gray-500 flex items-center gap-2">
-                <MapPin size={18} className="text-golden" /> {property.location} • {property.type}
-              </p>
+              <div className="flex items-center gap-4">
+                <p className="text-gray-500 flex items-center gap-2">
+                  <MapPin size={18} className="text-golden" /> {property.location} • {property.type}
+                </p>
+                <a
+                  href={`https://wa.me/?text=Check out this property on The Golden Stay: ${property.title} in ${property.location} — ₹${property.price.toLocaleString('en-IN')}/night. ${window.location.href}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs font-bold text-green-600 border border-green-200 px-3 py-1.5 rounded-full hover:bg-green-50 transition"
+                >
+                  <Share2 size={12} /> Share on WhatsApp
+                </a>
+              </div>
             </div>
             <div className="text-center bg-gray-50 px-4 py-2 rounded-lg border border-gray-200 shrink-0">
               <span className="text-2xl font-bold text-charcoal flex items-center gap-1 justify-center">
@@ -404,6 +441,114 @@ const PropertyDetails = () => {
               )}
             </div>
           </div>
+          {/* Q&A Section */}
+          <div className="border-t border-gray-100 pt-10 mt-4">
+            <h2 className="text-2xl font-bold font-serif mb-6 flex items-center gap-2">
+              <HelpCircle size={20} className="text-golden" /> Questions & Answers
+            </h2>
+
+            {/* Existing Q&A */}
+            {qaList.length > 0 && (
+              <div className="space-y-4 mb-6">
+                {(showAllQA ? qaList : qaList.slice(0, 3)).map(q => (
+                  <div key={q.id} className="bg-gray-50 rounded-2xl p-5">
+                    <p className="font-bold text-charcoal text-sm mb-1">Q: {q.question}</p>
+                    <p className="text-xs text-gray-400 mb-2">Asked by {q.asker_name || 'Guest'} · {new Date(q.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    {q.answer ? (
+                      <div className="border-l-2 border-golden pl-3 mt-2">
+                        <p className="text-sm text-gray-700">{q.answer}</p>
+                        <p className="text-xs text-golden font-bold mt-1">— The Golden Stay Team</p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic mt-1">Answer pending…</p>
+                    )}
+                  </div>
+                ))}
+                {qaList.length > 3 && (
+                  <button onClick={() => setShowAllQA(v => !v)}
+                    className="flex items-center gap-1 text-sm text-golden font-bold hover:underline">
+                    {showAllQA ? <><ChevronUp size={14} /> Show less</> : <><ChevronDown size={14} /> Show all {qaList.length} questions</>}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Ask a question */}
+            {!user ? (
+              <p className="text-sm text-gray-400">
+                <Link to="/login" className="text-golden font-bold hover:underline">Sign in</Link> to ask a question.
+              </p>
+            ) : qaSuccess ? (
+              <p className="text-green-600 text-sm font-bold flex items-center gap-2">
+                <CheckCircle size={16} /> Question submitted! Our team will answer shortly.
+              </p>
+            ) : (
+              <div className="flex gap-3">
+                <input
+                  value={qaQuestion}
+                  onChange={e => { setQaQuestion(e.target.value); setQaError(''); }}
+                  placeholder="Ask something about this property…"
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-golden/30"
+                />
+                <button
+                  disabled={qaSubmitting}
+                  onClick={async () => {
+                    if (!qaQuestion.trim()) { setQaError('Please type a question.'); return; }
+                    setQaSubmitting(true);
+                    try {
+                      const newQ = await askQuestion({
+                        property_id: property.id,
+                        user_id: user.id,
+                        asker_name: user.user_metadata?.full_name || user.email.split('@')[0],
+                        question: qaQuestion.trim(),
+                      });
+                      setQaList(prev => [newQ, ...prev]);
+                      setQaQuestion('');
+                      setQaSuccess(true);
+                      setTimeout(() => setQaSuccess(false), 4000);
+                    } catch { setQaError('Failed to submit. Try again.'); }
+                    finally { setQaSubmitting(false); }
+                  }}
+                  className="bg-golden hover:bg-golden-dark text-white font-bold px-5 py-2.5 rounded-xl text-sm transition disabled:opacity-60 whitespace-nowrap"
+                >
+                  {qaSubmitting ? '…' : 'Ask'}
+                </button>
+              </div>
+            )}
+            {qaError && <p className="text-red-500 text-xs mt-2">{qaError}</p>}
+          </div>
+
+          {/* Similar Properties */}
+          {similarProperties.length > 0 && (
+            <div className="border-t border-gray-100 pt-10 mt-4">
+              <h2 className="text-2xl font-bold font-serif mb-6">Similar Properties</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                {similarProperties.map(p => (
+                  <Link key={p.id} to={`/property/${p.id}`}
+                    className="group bg-gray-50 rounded-2xl overflow-hidden border border-gray-100 hover:border-golden/30 hover:shadow-md transition">
+                    <div className="h-36 overflow-hidden">
+                      <img src={p.image} alt={p.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    </div>
+                    <div className="p-4">
+                      <p className="font-bold text-charcoal text-sm truncate">{p.title}</p>
+                      <p className="text-gray-400 text-xs flex items-center gap-1 mt-0.5">
+                        <MapPin size={10} /> {p.city}
+                      </p>
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-golden font-bold text-sm">₹{p.price.toLocaleString('en-IN')}<span className="text-gray-400 font-normal text-xs">/night</span></p>
+                        {p.rating && (
+                          <span className="flex items-center gap-0.5 text-xs font-bold text-gray-600">
+                            <Star size={11} className="fill-golden text-golden" /> {p.rating}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* Right Column: Booking Widget */}

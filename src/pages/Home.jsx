@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { subscribeNewsletter } from '../lib/newsletter';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, ArrowRight, Star, Shield, Coffee, Wifi } from 'lucide-react';
@@ -7,6 +8,75 @@ import PropertyCard from '../components/PropertyCard';
 import Testimonials from '../components/Testimonials';
 import FAQ from '../components/FAQ';
 import { Helmet } from 'react-helmet-async';
+
+const NewsletterSection = () => {
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [status, setStatus] = useState('idle'); // idle | loading | success | error | duplicate
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!email) return;
+    setStatus('loading');
+    try {
+      await subscribeNewsletter(email, name);
+      setStatus('success');
+      setEmail(''); setName('');
+    } catch (err) {
+      setStatus(err.message === 'already_subscribed' ? 'duplicate' : 'error');
+    }
+  };
+
+  return (
+    <section className="py-20 bg-charcoal">
+      <div className="max-w-2xl mx-auto px-4 text-center">
+        <motion.div variants={fadeInUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+          <p className="text-golden text-sm font-bold uppercase tracking-widest mb-3">Stay in the Loop</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-white font-serif mb-4">
+            Get Exclusive Deals & New Listings
+          </h2>
+          <p className="text-gray-400 mb-8">
+            Be the first to know about flash deals, new properties, and seasonal offers.
+          </p>
+          {status === 'success' ? (
+            <div className="bg-green-500/20 border border-green-500/40 rounded-2xl px-8 py-6 text-green-400 font-bold text-lg">
+              🎉 You're subscribed! Welcome to The Golden Stay family.
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                placeholder="Your name (optional)"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="flex-none sm:w-36 px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-500 text-sm outline-none focus:ring-2 focus:ring-golden/40"
+              />
+              <input
+                type="email"
+                placeholder="Your email address"
+                value={email}
+                onChange={e => { setEmail(e.target.value); setStatus('idle'); }}
+                required
+                className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-500 text-sm outline-none focus:ring-2 focus:ring-golden/40"
+              />
+              <button type="submit" disabled={status === 'loading'}
+                className="bg-golden hover:bg-golden-dark text-white font-bold px-6 py-3 rounded-xl text-sm transition disabled:opacity-60 whitespace-nowrap">
+                {status === 'loading' ? 'Subscribing…' : 'Subscribe'}
+              </button>
+            </form>
+          )}
+          {status === 'duplicate' && (
+            <p className="text-yellow-400 text-sm mt-3">You're already subscribed!</p>
+          )}
+          {status === 'error' && (
+            <p className="text-red-400 text-sm mt-3">Something went wrong. Please try again.</p>
+          )}
+          <p className="text-gray-500 text-xs mt-4">No spam. Unsubscribe anytime.</p>
+        </motion.div>
+      </div>
+    </section>
+  );
+};
 
 // Animation Variants
 const fadeInUp = {
@@ -334,6 +404,9 @@ const Home = () => {
 
       {/* --- FAQ SECTION --- */}
       <FAQ />
+
+      {/* --- NEWSLETTER SECTION --- */}
+      <NewsletterSection />
 
     </div>
   );

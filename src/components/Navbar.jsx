@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContextUtils';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, LayoutDashboard, ChevronDown, ShieldCheck, Heart, UserCog, Bell, CalendarDays, Home } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, ChevronDown, ShieldCheck, Heart, UserCog, Bell, CalendarDays, Home, Award, Moon, Sun } from 'lucide-react';
 import { getNotifications, markAllRead, markRead } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
 
@@ -31,7 +31,21 @@ const Navbar = () => {
   const [broadcastSeen, setBroadcastSeen] = useState(() => {
     try { return localStorage.getItem('broadcast_seen') || '1970-01-01'; } catch { return '1970-01-01'; }
   });
+  const [darkMode, setDarkMode] = useState(() => {
+    try { return localStorage.getItem('theme') === 'dark'; } catch { return false; }
+  });
   const bellRef = useRef(null);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (darkMode) {
+      root.setAttribute('data-theme', 'dark');
+      try { localStorage.setItem('theme', 'dark'); } catch {}
+    } else {
+      root.removeAttribute('data-theme');
+      try { localStorage.setItem('theme', 'light'); } catch {}
+    }
+  }, [darkMode]);
 
   const closeMenu = () => { setIsMobileMenuOpen(false); setIsUserMenuOpen(false); };
 
@@ -136,6 +150,15 @@ const Navbar = () => {
             <Link to="/contact" className="bg-golden text-white px-5 py-2 rounded-full font-bold hover:bg-golden-dark transition shadow-md text-sm">
               Become a Host
             </Link>
+
+            {/* Dark mode toggle */}
+            <button
+              onClick={() => setDarkMode(d => !d)}
+              aria-label="Toggle dark mode"
+              className="p-2 rounded-full hover:bg-gray-100 transition text-gray-600 hover:text-golden"
+            >
+              {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
 
             {/* Bell icon — logged-in users only */}
             {user && (
@@ -242,6 +265,13 @@ const Navbar = () => {
                     >
                       <UserCog size={16} /> Edit Profile
                     </Link>
+                    <Link
+                      to="/rewards"
+                      onClick={closeMenu}
+                      className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 hover:text-golden transition"
+                    >
+                      <Award size={16} /> My Rewards
+                    </Link>
                     {isAdmin && (
                       <Link
                         to="/owner"
@@ -274,6 +304,13 @@ const Navbar = () => {
 
           {/* --- MOBILE HAMBURGER + BELL --- */}
           <div className="md:hidden flex items-center gap-1">
+            <button
+              onClick={() => setDarkMode(d => !d)}
+              aria-label="Toggle dark mode"
+              className="p-2 text-gray-600 hover:text-golden"
+            >
+              {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             {user && (
               <button
                 onClick={openBell}

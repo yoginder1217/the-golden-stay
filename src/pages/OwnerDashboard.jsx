@@ -7,12 +7,14 @@ import { getProperties, createProperty, updateProperty, deleteProperty, uploadPr
 import { getBlockedDates, addBlockedDate, removeBlockedDate } from '../lib/availability';
 import { supabase } from '../lib/supabase';
 import { createNotification } from '../lib/notifications';
+import { getAllQA, answerQuestion } from '../lib/qa';
 import {
   TrendingUp, Calendar, Home, CreditCard,
   Search, RefreshCw, BarChart2, Users,
   Globe, ToggleLeft, ToggleRight, Mail,
   ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X,
   Download, Reply, CalendarX, Upload, ImageIcon,
+  HelpCircle, Tag, Zap, CheckCircle,
 } from 'lucide-react';
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
@@ -30,8 +32,9 @@ const STATUS_COLORS = {
 
 const EMPTY_PROP_FORM = {
   title: '', type: '2BHK', city: '', location: '',
-  price: '', weekend_premium: 0, image: '', images: [], description: '',
+  price: '', weekend_premium: 0, min_nights: 1, image: '', images: [], description: '',
   amenities: '', airbnb: '', mmt: '', goibibo: '',
+  is_featured: false, discount_percent: 0, deal_label: '',
 };
 
 const OwnerDashboard = () => {
@@ -81,6 +84,12 @@ const OwnerDashboard = () => {
   const [blockForm, setBlockForm] = useState({ start: '', end: '', reason: '' });
   const [blockSaving, setBlockSaving] = useState(false);
   const [blockError, setBlockError] = useState('');
+
+  // Q&A tab
+  const [qaList, setQaList] = useState([]);
+  const [qaLoading, setQaLoading] = useState(false);
+  const [qaAnswerMap, setQaAnswerMap] = useState({});
+  const [qaAnsweringId, setQaAnsweringId] = useState(null);
 
   // Channel manager: per-property platform toggles
   const [channels, setChannels] = useState({});
@@ -142,6 +151,13 @@ const OwnerDashboard = () => {
 
   useEffect(() => { setPage(1); }, [search, statusFilter, propertyFilter]);
 
+  useEffect(() => {
+    if (isAdmin && activeTab === 'qa') {
+      setQaLoading(true);
+      getAllQA().then(setQaList).catch(() => {}).finally(() => setQaLoading(false));
+    }
+  }, [isAdmin, activeTab]);
+
   const handleStatusChange = async (bookingId, newStatus) => {
     setUpdatingId(bookingId);
     try {
@@ -150,6 +166,20 @@ const OwnerDashboard = () => {
     } catch {
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleAnswerQA = async (id) => {
+    const answer = qaAnswerMap[id]?.trim();
+    if (!answer) return;
+    setQaAnsweringId(id);
+    try {
+      const updated = await answerQuestion(id, answer);
+      setQaList(prev => prev.map(q => q.id === id ? updated : q));
+      setQaAnswerMap(prev => ({ ...prev, [id]: '' }));
+    } catch {
+    } finally {
+      setQaAnsweringId(null);
     }
   };
 
@@ -176,6 +206,7 @@ const OwnerDashboard = () => {
       location: p.location,
       price: String(p.price),
       weekend_premium: p.weekend_premium || 0,
+      min_nights: p.min_nights || 1,
       image: p.image || '',
       images: p.images || [],
       description: p.description || '',
@@ -183,6 +214,9 @@ const OwnerDashboard = () => {
       airbnb: p.links?.airbnb || '',
       mmt: p.links?.mmt || '',
       goibibo: p.links?.goibibo || '',
+      is_featured: p.is_featured || false,
+      discount_percent: p.discount_percent || 0,
+      deal_label: p.deal_label || '',
     });
     setPropError('');
     setShowPropForm(true);
@@ -204,6 +238,7 @@ const OwnerDashboard = () => {
         location: propForm.location.trim(),
         price: parseInt(propForm.price, 10),
         weekend_premium: Math.round(propForm.weekend_premium) || 0,
+        min_nights: Math.max(1, parseInt(propForm.min_nights, 10) || 1),
         image: propForm.image.trim() || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=800',
         images: propForm.images.filter(Boolean),
         description: propForm.description.trim(),
@@ -214,6 +249,9 @@ const OwnerDashboard = () => {
           ...(propForm.goibibo && { goibibo: propForm.goibibo.trim() }),
           direct: '/checkout',
         },
+        is_featured: propForm.is_featured,
+        discount_percent: propForm.is_featured ? (parseInt(propForm.discount_percent, 10) || 0) : 0,
+        deal_label: propForm.is_featured ? propForm.deal_label.trim() : '',
       };
       if (editingProp) {
         const updated = await updateProperty(editingProp.id, propertyData);
@@ -424,6 +462,8 @@ const OwnerDashboard = () => {
   const tabs = [
     { id: 'bookings', label: 'All Bookings', icon: Users },
     { id: 'properties', label: 'Properties', icon: Home },
+    { id: 'guests', label: 'Guest History', icon: Calendar },
+    { id: 'qa', label: 'Q&A', icon: HelpCircle },
     { id: 'messages', label: `Messages${messages.length ? ` (${messages.length})` : ''}`, icon: Mail },
     { id: 'channels', label: 'Channel Manager', icon: Globe },
     { id: 'promos', label: 'Promo Codes', icon: CreditCard },
@@ -620,6 +660,19 @@ const OwnerDashboard = () => {
                       <p className="text-xs text-gray-400 mt-1">0 = flat rate. e.g. 20 = 20% more on Fri &amp; Sat nights.</p>
                     </div>
                     <div>
+                      <label className={labelCls}>Min Stay (nights)</label>
+                      <input
+                        type="number"
+                        placeholder="1"
+                        min="1"
+                        max="30"
+                        value={propForm.min_nights}
+                        onChange={e => setPropForm(f => ({ ...f, min_nights: e.target.valueAsNumber || 1 }))}
+                        className={inputCls}
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Minimum nights a guest must book.</p>
+                    </div>
+                    <div>
                       <label className={labelCls}>City *</label>
                       <input
                         type="text"
@@ -774,6 +827,50 @@ const OwnerDashboard = () => {
                         className={inputCls}
                       />
                     </div>
+                    {/* Flash Deal */}
+                    <div className="sm:col-span-2">
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-2 text-xs font-bold text-amber-700 uppercase tracking-wide cursor-pointer">
+                            <Zap size={14} className="text-amber-500" /> Flash Deal
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setPropForm(f => ({ ...f, is_featured: !f.is_featured }))}
+                            className="text-amber-600"
+                          >
+                            {propForm.is_featured
+                              ? <ToggleRight size={28} className="text-amber-500" />
+                              : <ToggleLeft size={28} className="text-gray-400" />}
+                          </button>
+                        </div>
+                        {propForm.is_featured && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className={labelCls}>Discount (%)</label>
+                              <input
+                                type="number"
+                                placeholder="e.g. 20"
+                                min="1" max="99"
+                                value={propForm.discount_percent}
+                                onChange={e => setPropForm(f => ({ ...f, discount_percent: e.target.valueAsNumber || 0 }))}
+                                className={inputCls}
+                              />
+                            </div>
+                            <div>
+                              <label className={labelCls}>Deal Label</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Weekend Special"
+                                value={propForm.deal_label}
+                                onChange={e => setPropForm(f => ({ ...f, deal_label: e.target.value }))}
+                                className={inputCls}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   {propError && <p className="text-red-500 text-sm">{propError}</p>}
                   <div className="flex gap-3 pt-2">
@@ -861,6 +958,16 @@ const OwnerDashboard = () => {
                             <span className="text-sm font-bold text-golden">₹{Number(p.price).toLocaleString('en-IN')}/night</span>
                             {p.weekend_premium > 0 && (
                               <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-bold">+{p.weekend_premium}% wknd</span>
+                            )}
+                            {p.is_featured && p.discount_percent > 0 && (
+                              <span className="text-xs text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                <Zap size={10} /> {p.discount_percent}% OFF
+                              </span>
+                            )}
+                            {p.min_nights > 1 && (
+                              <span className="text-xs text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full font-bold">
+                                {p.min_nights}n min
+                              </span>
                             )}
                             <button
                               onClick={() => handleEditProp(p)}
@@ -956,6 +1063,138 @@ const OwnerDashboard = () => {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Guest History */}
+        {activeTab === 'guests' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-gray-100">
+              <h2 className="font-bold text-charcoal flex items-center gap-2 text-base">
+                <Calendar size={16} className="text-golden" /> Guest History
+              </h2>
+            </div>
+            {loading ? (
+              <div className="p-14 flex items-center justify-center">
+                <svg className="animate-spin h-7 w-7 text-golden" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+              </div>
+            ) : bookings.length === 0 ? (
+              <div className="p-14 text-center text-gray-400 text-sm">No bookings yet.</div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {Object.entries(
+                  bookings.reduce((acc, b) => {
+                    const key = b.property_title || 'Unknown Property';
+                    if (!acc[key]) acc[key] = [];
+                    acc[key].push(b);
+                    return acc;
+                  }, {})
+                ).map(([propTitle, propBookings]) => (
+                  <div key={propTitle} className="p-5">
+                    <h3 className="font-bold text-charcoal text-sm mb-3 flex items-center gap-2">
+                      <Home size={14} className="text-golden" /> {propTitle}
+                      <span className="ml-1 text-xs bg-golden text-white px-2 py-0.5 rounded-full font-bold">{propBookings.length}</span>
+                    </h3>
+                    <div className="space-y-2">
+                      {propBookings.map(b => (
+                        <div key={b.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-gray-50 rounded-xl px-4 py-3">
+                          <div>
+                            <p className="font-semibold text-charcoal text-sm">{b.guest_name}</p>
+                            <p className="text-xs text-gray-400">{b.guest_email}{b.guest_phone && ` · ${b.guest_phone}`}</p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                            <span>{fmtDate(b.checkin_date)} → {fmtDate(b.checkout_date)}</span>
+                            <span className="font-bold text-charcoal">{fmt(b.total)}</span>
+                            <span className={`px-2 py-0.5 rounded-full border font-bold ${STATUS_COLORS[b.status] ?? STATUS_COLORS.confirmed}`}>
+                              {b.status ?? 'confirmed'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Q&A Panel */}
+        {activeTab === 'qa' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-bold text-charcoal flex items-center gap-2 text-base">
+                <HelpCircle size={16} className="text-golden" /> Guest Q&amp;A
+              </h2>
+              <button
+                onClick={() => { setQaLoading(true); getAllQA().then(setQaList).catch(() => {}).finally(() => setQaLoading(false)); }}
+                className="text-golden text-sm font-bold flex items-center gap-1 hover:underline"
+              >
+                <RefreshCw size={13} /> Refresh
+              </button>
+            </div>
+            {qaLoading ? (
+              <div className="p-14 flex items-center justify-center">
+                <svg className="animate-spin h-7 w-7 text-golden" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+              </div>
+            ) : qaList.length === 0 ? (
+              <div className="p-14 text-center text-gray-400 text-sm">No questions yet.</div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {/* Unanswered first */}
+                {[...qaList].sort((a, b) => (a.answer ? 1 : 0) - (b.answer ? 1 : 0)).map(q => (
+                  <div key={q.id} className="p-5">
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="flex-1">
+                        <p className="font-bold text-charcoal text-sm">{q.question}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          by <span className="font-medium">{q.asker_name || 'Guest'}</span>
+                          {q.property_id && <span className="ml-2 text-gray-300">· Property {q.property_id.slice(0, 8)}</span>}
+                          <span className="ml-2">{fmtDate(q.created_at)}</span>
+                        </p>
+                      </div>
+                      {!q.answer && (
+                        <span className="shrink-0 text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Unanswered</span>
+                      )}
+                      {q.answer && (
+                        <span className="shrink-0 text-xs font-bold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <CheckCircle size={10} /> Answered
+                        </span>
+                      )}
+                    </div>
+                    {q.answer ? (
+                      <div className="mt-2 bg-golden/5 border border-golden/20 rounded-xl px-4 py-3">
+                        <p className="text-xs font-bold text-golden mb-1">Your Answer</p>
+                        <p className="text-sm text-charcoal">{q.answer}</p>
+                      </div>
+                    ) : (
+                      <div className="mt-3 flex gap-2">
+                        <textarea
+                          rows={2}
+                          placeholder="Type your answer…"
+                          value={qaAnswerMap[q.id] || ''}
+                          onChange={e => setQaAnswerMap(prev => ({ ...prev, [q.id]: e.target.value }))}
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-golden/40 resize-none"
+                        />
+                        <button
+                          onClick={() => handleAnswerQA(q.id)}
+                          disabled={qaAnsweringId === q.id || !qaAnswerMap[q.id]?.trim()}
+                          className="px-4 py-2 bg-golden hover:bg-golden-dark text-white font-bold text-xs rounded-xl transition disabled:opacity-50 self-start"
+                        >
+                          {qaAnsweringId === q.id ? 'Saving…' : 'Answer'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
