@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { getPropertyById, getProperties } from '../lib/properties';
 import { calculateDynamicPricing } from '../lib/pricing';
-import { Wifi, Home, Star, MapPin, CheckCircle, ExternalLink, ArrowRight, Users, Calendar, MessageSquare, LogIn, Share2, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Wifi, Home, Star, MapPin, CheckCircle, ExternalLink, ArrowRight, Users, Calendar, MessageSquare, LogIn, Share2, HelpCircle, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, Images, AirVent, Utensils, UtensilsCrossed, Car, Waves, Dumbbell, Tv, Monitor, Zap, Leaf, Trees, Droplets, Flame, Laptop, Bell, Eye, User, Building2, Train } from 'lucide-react';
 import { getPropertyQA, askQuestion } from '../lib/qa';
 import { Helmet } from 'react-helmet-async';
 import WishlistButton from '../components/WishlistButton';
@@ -15,6 +15,36 @@ import AvailabilityCalendar from '../components/AvailabilityCalendar';
 
 const CLEANING_FEE = 500;
 const SERVICE_FEE = 300;
+
+const AMENITY_ICONS = {
+  'wifi': Wifi,
+  'ac': AirVent,
+  'air conditioning': AirVent,
+  'kitchen': Utensils,
+  'full kitchen': UtensilsCrossed,
+  'parking': Car,
+  'pool': Waves,
+  'swimming pool': Waves,
+  'beach access': Waves,
+  'sea view': Eye,
+  'garden view': Trees,
+  'garden': Leaf,
+  'courtyard': Building2,
+  'tv': Tv,
+  'smart tv': Monitor,
+  'gym access': Dumbbell,
+  'gym': Dumbbell,
+  'workspace': Laptop,
+  'power backup': Zap,
+  'geyser': Droplets,
+  'hot water': Droplets,
+  'bbq': Flame,
+  'metro access': Train,
+  'caretaker': User,
+  'concierge': Bell,
+};
+
+const getAmenityIcon = (name) => AMENITY_ICONS[name.toLowerCase()] ?? Home;
 
 const formatDate = (dateStr) =>
   dateStr
@@ -78,6 +108,8 @@ const PropertyDetails = () => {
   const [reviewError, setReviewError] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState(false);
+
+  const [showMobileBooking, setShowMobileBooking] = useState(false);
 
   // Q&A state
   const [qaList, setQaList] = useState([]);
@@ -195,6 +227,34 @@ const PropertyDetails = () => {
     }
   };
 
+  // Build image list (null-safe for before property loads)
+  const imgs = useMemo(() => {
+    if (!property) return [];
+    return (property.images?.length > 0)
+      ? property.images
+      : [
+          property.image,
+          'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&q=80&w=800',
+          'https://images.unsplash.com/photo-1617325247661-675ab4b64ae2?auto=format&fit=crop&q=80&w=800',
+          'https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?auto=format&fit=crop&q=80&w=800',
+          'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&q=80&w=800',
+        ];
+  }, [property]);
+
+  // Lightbox
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const handleKey = (e) => {
+      if (e.key === 'Escape') setLightboxIndex(null);
+      if (e.key === 'ArrowRight') setLightboxIndex(i => (i + 1) % imgs.length);
+      if (e.key === 'ArrowLeft') setLightboxIndex(i => (i - 1 + imgs.length) % imgs.length);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [lightboxIndex, imgs.length]);
+
   if (propLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -220,7 +280,7 @@ const PropertyDetails = () => {
   }
 
   return (
-    <div className="bg-white">
+    <div className="bg-white pb-24 lg:pb-0">
       <Helmet>
         <title>{property.title} | The Golden Stay</title>
         <meta name="description" content={property.description} />
@@ -237,42 +297,39 @@ const PropertyDetails = () => {
       </Helmet>
 
       {/* Image Gallery */}
-      {(() => {
-        const imgs = (property.images && property.images.length > 0)
-          ? property.images
-          : [
-              property.image,
-              'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&q=80&w=600',
-              'https://images.unsplash.com/photo-1617325247661-675ab4b64ae2?auto=format&fit=crop&q=80&w=600',
-              'https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?auto=format&fit=crop&q=80&w=600',
-              'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&q=80&w=600',
-            ];
-        return (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1 }}
-            className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 h-[50vh] md:h-[60vh] gap-1 md:gap-2 p-1 md:p-2"
+      <div className="relative">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1 }}
+          className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 h-[50vh] md:h-[60vh] gap-1 md:gap-2 p-1 md:p-2"
+        >
+          <div
+            className="md:col-span-2 md:row-span-2 overflow-hidden rounded-xl relative cursor-pointer group"
+            onClick={() => setLightboxIndex(0)}
           >
-            <div className="md:col-span-2 md:row-span-2 overflow-hidden rounded-xl relative">
-              <img src={imgs[0]} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" alt={property.title} loading="eager" />
-              <WishlistButton property={property} className="absolute top-3 left-3" />
+            <img src={imgs[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={property.title} loading="eager" />
+            <WishlistButton property={property} className="absolute top-3 left-3" />
+          </div>
+          {[1, 2, 3, 4].map((idx) => imgs[idx] && (
+            <div
+              key={idx}
+              className="overflow-hidden rounded-xl hidden md:block relative cursor-pointer group"
+              onClick={() => setLightboxIndex(idx)}
+            >
+              <img src={imgs[idx]} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={`Photo ${idx + 1}`} loading="lazy" />
             </div>
-            {[1, 2, 3, 4].map((idx) => imgs[idx] && (
-              <div key={idx} className={`overflow-hidden rounded-xl hidden md:block ${idx === 4 ? 'relative' : ''}`}>
-                <img src={imgs[idx]} className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" alt={`Photo ${idx + 1}`} loading="lazy" />
-                {idx === 4 && imgs.length > 5 && (
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                    <span className="text-white font-bold border border-white px-4 py-2 rounded-full backdrop-blur-sm text-sm">
-                      +{imgs.length - 5} more
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </motion.div>
-        );
-      })()}
+          ))}
+        </motion.div>
+
+        {/* Show all photos button */}
+        <button
+          onClick={() => setLightboxIndex(0)}
+          className="absolute bottom-5 right-5 hidden md:flex items-center gap-2 bg-white/95 backdrop-blur-sm text-charcoal text-xs font-bold px-4 py-2.5 rounded-full shadow-lg border border-gray-200 hover:bg-white transition"
+        >
+          <Images size={14} /> Show all {imgs.length} photos
+        </button>
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 py-12 grid grid-cols-1 lg:grid-cols-3 gap-16">
 
@@ -320,12 +377,15 @@ const PropertyDetails = () => {
 
           <h2 className="text-2xl font-bold mb-6 font-serif">Amenities</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-12">
-            {property.amenities.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-4 text-gray-700 p-4 rounded-xl bg-gray-50 border border-transparent hover:border-golden/30 transition">
-                <div className="p-2 bg-white rounded-full text-golden shadow-sm"><Home size={20} /></div>
-                <span className="font-medium">{item}</span>
-              </div>
-            ))}
+            {property.amenities.map((item, idx) => {
+              const AmenityIcon = getAmenityIcon(item);
+              return (
+                <div key={idx} className="flex items-center gap-4 text-gray-700 p-4 rounded-xl bg-gray-50 border border-transparent hover:border-golden/30 transition">
+                  <div className="p-2 bg-white rounded-full text-golden shadow-sm shrink-0"><AmenityIcon size={20} /></div>
+                  <span className="font-medium">{item}</span>
+                </div>
+              );
+            })}
           </div>
 
           {/* Location Map */}
@@ -712,6 +772,257 @@ const PropertyDetails = () => {
           </motion.div>
         </div>
       </div>
+
+      {/* ── Lightbox ── */}
+      <AnimatePresence>
+        {lightboxIndex !== null && (
+          <motion.div
+            key="lightbox"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[90] bg-black/95 flex items-center justify-center"
+            onClick={() => setLightboxIndex(null)}
+          >
+            {/* Close */}
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(null); }}
+              className="absolute top-4 right-4 z-10 p-2.5 bg-white/10 hover:bg-white/25 rounded-full text-white transition"
+            >
+              <X size={22} />
+            </button>
+
+            {/* Counter */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white text-sm font-bold bg-black/50 px-4 py-1.5 rounded-full backdrop-blur-sm select-none">
+              {lightboxIndex + 1} / {imgs.length}
+            </div>
+
+            {/* Prev */}
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(i => (i - 1 + imgs.length) % imgs.length); }}
+              className="absolute left-3 md:left-6 p-3 bg-white/10 hover:bg-white/25 rounded-full text-white transition"
+            >
+              <ChevronLeft size={26} />
+            </button>
+
+            {/* Main image */}
+            <motion.img
+              key={lightboxIndex}
+              src={imgs[lightboxIndex]}
+              alt={`Photo ${lightboxIndex + 1}`}
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="max-h-[80vh] max-w-[85vw] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+
+            {/* Next */}
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(i => (i + 1) % imgs.length); }}
+              className="absolute right-3 md:right-6 p-3 bg-white/10 hover:bg-white/25 rounded-full text-white transition"
+            >
+              <ChevronRight size={26} />
+            </button>
+
+            {/* Thumbnail strip */}
+            <div
+              className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 px-4 max-w-[90vw] overflow-x-auto scrollbar-hide"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {imgs.map((src, i) => (
+                <button
+                  key={i}
+                  onClick={() => setLightboxIndex(i)}
+                  className={`w-14 h-10 rounded overflow-hidden shrink-0 transition-all ${
+                    i === lightboxIndex
+                      ? 'ring-2 ring-golden ring-offset-1 ring-offset-black opacity-100'
+                      : 'opacity-40 hover:opacity-70'
+                  }`}
+                >
+                  <img src={src} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Mobile sticky booking bar (hidden on lg+) ── */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] px-4 py-3 flex items-center justify-between">
+        <div>
+          <div className="flex items-baseline gap-1">
+            <span className="text-xl font-bold text-charcoal">₹{property.price.toLocaleString('en-IN')}</span>
+            <span className="text-gray-400 text-sm">/ night</span>
+          </div>
+          {(avgRating ?? property.rating) && (
+            <div className="flex items-center gap-1 mt-0.5">
+              <Star size={11} className="fill-golden text-golden" />
+              <span className="text-xs font-bold text-charcoal">{avgRating ?? property.rating}</span>
+              {reviews.length > 0 && <span className="text-xs text-gray-400">({reviews.length})</span>}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => setShowMobileBooking(true)}
+          className="bg-golden hover:bg-golden-dark text-white font-bold px-7 py-3 rounded-xl transition shadow-md text-sm"
+        >
+          Reserve
+        </button>
+      </div>
+
+      {/* ── Mobile booking bottom sheet ── */}
+      <AnimatePresence>
+        {showMobileBooking && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="lg:hidden fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm"
+              onClick={() => setShowMobileBooking(false)}
+            />
+
+            {/* Sheet */}
+            <motion.div
+              key="sheet"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="lg:hidden fixed bottom-0 left-0 right-0 z-[70] bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto"
+            >
+              {/* Drag handle */}
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 bg-gray-200 rounded-full" />
+              </div>
+
+              {/* Sheet header */}
+              <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100">
+                <div>
+                  <span className="text-2xl font-bold text-charcoal">₹{property.price.toLocaleString('en-IN')}</span>
+                  <span className="text-gray-400 text-sm"> / night</span>
+                  {property.weekend_premium > 0 && (
+                    <div className="text-xs text-amber-600 font-bold mt-0.5">
+                      ₹{Math.round(property.price * (1 + property.weekend_premium / 100)).toLocaleString('en-IN')}/night on Fri &amp; Sat
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowMobileBooking(false)}
+                  className="p-2 rounded-full hover:bg-gray-100 transition"
+                >
+                  <X size={20} className="text-charcoal" />
+                </button>
+              </div>
+
+              {/* Booking form */}
+              <div className="px-6 py-5">
+                {/* Date + Guests */}
+                <div className="border border-gray-200 rounded-xl overflow-hidden mb-4">
+                  <div className="grid grid-cols-2 divide-x divide-gray-200">
+                    <div className="p-3">
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+                        <Calendar size={11} /> Check-in
+                      </label>
+                      <input
+                        type="date"
+                        min={today}
+                        value={checkin}
+                        onChange={handleCheckinChange}
+                        className="w-full text-sm font-medium text-charcoal outline-none [color-scheme:light]"
+                      />
+                    </div>
+                    <div className="p-3">
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+                        <Calendar size={11} /> Check-out
+                      </label>
+                      <input
+                        type="date"
+                        min={minCheckout}
+                        value={checkout}
+                        onChange={handleCheckoutChange}
+                        disabled={!checkin}
+                        className="w-full text-sm font-medium text-charcoal outline-none [color-scheme:light] disabled:text-gray-300"
+                      />
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-200 p-3">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+                      <Users size={11} /> Guests
+                    </label>
+                    <select
+                      value={guests}
+                      onChange={(e) => setGuests(e.target.value)}
+                      className="w-full text-sm font-medium text-charcoal outline-none"
+                    >
+                      {[1, 2, 3, 4, 5, 6].map(n => (
+                        <option key={n} value={n}>{n} {n === 1 ? 'guest' : 'guests'}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {dateError && (
+                  <p className="text-red-500 text-xs font-medium mb-3">⚠ {dateError}</p>
+                )}
+
+                {/* Price breakdown */}
+                {nights > 0 && (
+                  <div className="border-t border-b border-gray-100 py-4 mb-4 space-y-2 text-sm">
+                    {dynamicPricing.hasVariableRates ? (
+                      <>
+                        {dynamicPricing.weekdayNights > 0 && (
+                          <div className="flex justify-between text-gray-600">
+                            <span>₹{property.price.toLocaleString('en-IN')} × {dynamicPricing.weekdayNights} weekday {dynamicPricing.weekdayNights === 1 ? 'night' : 'nights'}</span>
+                            <span>₹{(dynamicPricing.weekdayNights * dynamicPricing.weekdayPrice).toLocaleString('en-IN')}</span>
+                          </div>
+                        )}
+                        {dynamicPricing.weekendNights > 0 && (
+                          <div className="flex justify-between text-gray-600">
+                            <span>₹{dynamicPricing.weekendPrice.toLocaleString('en-IN')} × {dynamicPricing.weekendNights} weekend {dynamicPricing.weekendNights === 1 ? 'night' : 'nights'}</span>
+                            <span>₹{(dynamicPricing.weekendNights * dynamicPricing.weekendPrice).toLocaleString('en-IN')}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex justify-between text-gray-600">
+                        <span>₹{property.price.toLocaleString('en-IN')} × {nights} {nights === 1 ? 'night' : 'nights'}</span>
+                        <span>₹{subtotal.toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-gray-600">
+                      <span>Cleaning fee</span><span>₹{CLEANING_FEE}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Service fee</span><span>₹{SERVICE_FEE}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-charcoal pt-2 border-t border-gray-100">
+                      <span>Total</span><span>₹{total.toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleBookDirect}
+                  className="w-full flex justify-between items-center bg-golden hover:bg-golden-dark text-white font-bold py-4 px-6 rounded-xl transition shadow-lg mb-4"
+                >
+                  <span>{nights > 0 ? `Reserve for ₹${total.toLocaleString('en-IN')}` : 'Check Availability'}</span>
+                  <ArrowRight size={18} />
+                </button>
+
+                <p className="text-center text-xs text-gray-400 flex items-center justify-center gap-1 pb-2">
+                  <CheckCircle size={11} /> No extra charges · Best price guaranteed
+                </p>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
