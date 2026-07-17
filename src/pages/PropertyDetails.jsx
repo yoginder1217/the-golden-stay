@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPropertyById, getProperties } from '../lib/properties';
@@ -110,6 +110,25 @@ const PropertyDetails = () => {
   const [reviewSuccess, setReviewSuccess] = useState(false);
 
   const [showMobileBooking, setShowMobileBooking] = useState(false);
+
+  // Sticky header
+  const [showStickyHeader, setShowStickyHeader] = useState(false);
+  const titleRef = useRef(null);
+  const bookingWidgetRef = useRef(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (titleRef.current) {
+        setShowStickyHeader(titleRef.current.getBoundingClientRect().bottom < 80);
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToBooking = useCallback(() => {
+    bookingWidgetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   // Q&A state
   const [qaList, setQaList] = useState([]);
@@ -343,7 +362,7 @@ const PropertyDetails = () => {
           {/* Header */}
           <div className="flex justify-between items-start mb-6">
             <div>
-              <h1 className="text-4xl font-bold text-charcoal mb-2 font-serif">{property.title}</h1>
+              <h1 ref={titleRef} className="text-4xl font-bold text-charcoal mb-2 font-serif">{property.title}</h1>
               <div className="flex items-center gap-4">
                 <p className="text-gray-500 flex items-center gap-2">
                   <MapPin size={18} className="text-golden" /> {property.location} • {property.type}
@@ -617,6 +636,7 @@ const PropertyDetails = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
+            ref={bookingWidgetRef}
             className="bg-white p-8 rounded-2xl shadow-2xl border border-gray-100 sticky top-24"
           >
             <div className="flex justify-between items-end mb-6">
@@ -772,6 +792,42 @@ const PropertyDetails = () => {
           </motion.div>
         </div>
       </div>
+
+      {/* ── Sticky scroll header (desktop only) ── */}
+      <AnimatePresence>
+        {showStickyHeader && (
+          <motion.div
+            key="sticky-header"
+            initial={{ y: -72 }}
+            animate={{ y: 0 }}
+            exit={{ y: -72 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="hidden lg:flex fixed top-16 left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm px-8 py-3 items-center justify-between"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <p className="font-bold text-charcoal text-sm truncate max-w-xs">{property.title}</p>
+              <span className="text-gray-300 shrink-0">·</span>
+              <span className="flex items-center gap-1 shrink-0">
+                <Star size={12} className="fill-golden text-golden" />
+                <span className="font-bold text-charcoal text-sm">{avgRating ?? property.rating}</span>
+                {reviews.length > 0 && <span className="text-gray-400 text-xs">({reviews.length})</span>}
+              </span>
+            </div>
+            <div className="flex items-center gap-5 shrink-0">
+              <div>
+                <span className="font-bold text-charcoal">₹{property.price.toLocaleString('en-IN')}</span>
+                <span className="text-gray-400 text-sm"> / night</span>
+              </div>
+              <button
+                onClick={scrollToBooking}
+                className="bg-golden hover:bg-golden-dark text-white font-bold px-5 py-2 rounded-xl text-sm transition shadow-sm"
+              >
+                Reserve
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Lightbox ── */}
       <AnimatePresence>

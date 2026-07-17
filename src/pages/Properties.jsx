@@ -5,7 +5,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { getProperties } from '../lib/properties';
 import PropertyCard from '../components/PropertyCard';
 import MapView from '../components/MapView';
-import { X, MapPin, SlidersHorizontal, LayoutGrid, Map, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, MapPin, SlidersHorizontal, LayoutGrid, Map, Clock, ChevronDown, ChevronUp, Calendar, Users } from 'lucide-react';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -105,23 +105,23 @@ const Properties = () => {
         <meta property="og:image" content="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=1200" />
       </Helmet>
 
-      {/* Header */}
-      <div className="relative h-[380px] flex items-center justify-center bg-fixed bg-cover bg-center"
+      {/* Header — compact */}
+      <div className="relative h-[160px] flex items-end bg-cover bg-center"
         style={{ backgroundImage: "url('https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=1920')" }}>
-        <div className="absolute inset-0 bg-charcoal/60" />
-        <div className="relative z-10 text-center text-white px-4">
-          <motion.h1 initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}
-            className="text-4xl md:text-6xl font-bold mb-4 font-serif">
+        <div className="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-charcoal/50 to-charcoal/30" />
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-4 pb-5">
+          <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
+            className="text-2xl md:text-3xl font-bold text-white font-serif">
             Our Exclusive Collection
           </motion.h1>
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-            className="text-lg md:text-xl text-gray-200 font-light">
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
+            className="text-sm text-gray-300 font-light mt-1">
             Handpicked sanctuaries for the modern family.
           </motion.p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 -mt-10 relative z-20">
+      <div className="max-w-7xl mx-auto px-4 -mt-6 relative z-20">
 
         {/* Filter Bar */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -241,9 +241,9 @@ const Properties = () => {
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
             className="mt-6 p-4 bg-white rounded-xl border border-golden/20 shadow-sm flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 items-center">
             <span className="font-bold text-charcoal">Search results:</span>
-            {locationQuery && <span>📍 <strong>{locationQuery}</strong></span>}
-            {checkinQuery && <span>📅 <strong>{new Date(checkinQuery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>}
-            {guestsQuery && <span>👥 <strong>{guestsQuery} guests</strong></span>}
+            {locationQuery && <span className="flex items-center gap-1"><MapPin size={12} className="text-golden shrink-0" /> <strong>{locationQuery}</strong></span>}
+            {checkinQuery && <span className="flex items-center gap-1"><Calendar size={12} className="text-golden shrink-0" /> <strong>{new Date(checkinQuery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>}
+            {guestsQuery && <span className="flex items-center gap-1"><Users size={12} className="text-golden shrink-0" /> <strong>{guestsQuery} guests</strong></span>}
             <span className="text-golden font-bold">{filteredProperties.length} found</span>
             <button onClick={clearSearch} className="ml-auto flex items-center gap-1 text-golden-dark font-bold hover:underline text-xs">
               <X size={12} /> Clear
