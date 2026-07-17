@@ -41,3 +41,14 @@ export const cancelBooking = async (bookingId) => {
   if (error) throw error;
   return data;
 };
+
+export const getBookingsByPropertyIds = async (propertyIds) => {
+  if (!propertyIds?.length) return [];
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('*')
+    .in('property_id', propertyIds)
+    .order('checkin_date', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+};

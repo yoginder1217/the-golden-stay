@@ -17,7 +17,12 @@ import {
   ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X,
   Download, Reply, CalendarX, Upload, ImageIcon,
   HelpCircle, Tag, Zap, CheckCircle, FileText, Save, PlusCircle,
+  UserCheck, Banknote, Send, Clock,
 } from 'lucide-react';
+import {
+  getOwners, saveOwner, deleteOwner, getPayouts, savePayout, markPayoutPaid,
+  getOwnerProperties, getOwnerBookings,
+} from '../lib/owners';
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
 const PAGE_SIZE = 10;
@@ -37,6 +42,18 @@ const EMPTY_PROP_FORM = {
   price: '', weekend_premium: 0, min_nights: 1, image: '', images: [], description: '',
   amenities: '', airbnb: '', mmt: '', goibibo: '',
   is_featured: false, discount_percent: 0, deal_label: '',
+  owner_id: '',
+};
+
+const EMPTY_OWNER_FORM = {
+  name: '', email: '', phone: '', commission_percent: '10',
+  bank_name: '', account_number: '', ifsc_code: '', upi_id: '', notes: '', user_id: '',
+};
+
+const EMPTY_PAYOUT_FORM = {
+  owner_id: '', period_label: '', period_start: '', period_end: '',
+  gross_amount: '', commission_amount: '', net_amount: '', booking_count: '',
+  notes: '',
 };
 
 const OwnerDashboard = () => {
@@ -92,6 +109,27 @@ const OwnerDashboard = () => {
   const [qaLoading, setQaLoading] = useState(false);
   const [qaAnswerMap, setQaAnswerMap] = useState({});
   const [qaAnsweringId, setQaAnsweringId] = useState(null);
+
+  // Owners tab
+  const [owners, setOwners] = useState([]);
+  const [ownersLoading, setOwnersLoading] = useState(false);
+  const [showOwnerForm, setShowOwnerForm] = useState(false);
+  const [editingOwner, setEditingOwner] = useState(null);
+  const [ownerForm, setOwnerForm] = useState(EMPTY_OWNER_FORM);
+  const [ownerSaving, setOwnerSaving] = useState(false);
+  const [ownerFormError, setOwnerFormError] = useState('');
+  const [deletingOwnerId, setDeletingOwnerId] = useState(null);
+
+  // Payouts tab
+  const [allPayouts, setAllPayouts] = useState([]);
+  const [payoutsLoading, setPayoutsLoading] = useState(false);
+  const [showPayoutForm, setShowPayoutForm] = useState(false);
+  const [payoutForm, setPayoutForm] = useState(EMPTY_PAYOUT_FORM);
+  const [payoutSaving, setPayoutSaving] = useState(false);
+  const [payoutFormError, setPayoutFormError] = useState('');
+  const [computingPayout, setComputingPayout] = useState(false);
+  const [markingPaidId, setMarkingPaidId] = useState(null);
+  const [markPaidForm, setMarkPaidForm] = useState({ payment_method: 'upi', transaction_ref: '', notes: '' });
 
   // Content CMS tab
   const { c, cJSON, setContent: setLiveContent, contentMap } = useSiteContent();
@@ -152,6 +190,16 @@ const OwnerDashboard = () => {
     finally { setPropertiesLoading(false); }
   }, []);
 
+  const fetchOwners = useCallback(async () => {
+    setOwnersLoading(true);
+    try { setOwners(await getOwners()); } catch {} finally { setOwnersLoading(false); }
+  }, []);
+
+  const fetchPayoutsAdmin = useCallback(async () => {
+    setPayoutsLoading(true);
+    try { setAllPayouts(await getPayouts()); } catch {} finally { setPayoutsLoading(false); }
+  }, []);
+
   useEffect(() => {
     if (isAdmin) {
       fetchBookings();
@@ -173,6 +221,118 @@ const OwnerDashboard = () => {
       getAllQA().then(setQaList).catch(() => {}).finally(() => setQaLoading(false));
     }
   }, [isAdmin, activeTab]);
+
+  // ── Owner handlers ──
+  const handleOwnerFormSubmit = async (e) => {
+    e.preventDefault();
+    if (!ownerForm.name.trim() || !ownerForm.email.trim()) {
+      setOwnerFormError('Name and email are required.'); return;
+    }
+    setOwnerFormError(''); setOwnerSaving(true);
+    try {
+      const payload = {
+        ...(editingOwner?.id ? { id: editingOwner.id } : {}),
+        name: ownerForm.name.trim(),
+        email: ownerForm.email.trim().toLowerCase(),
+        phone: ownerForm.phone.trim(),
+        commission_percent: parseFloat(ownerForm.commission_percent) || 10,
+        bank_name: ownerForm.bank_name.trim(),
+        account_number: ownerForm.account_number.trim(),
+        ifsc_code: ownerForm.ifsc_code.trim().toUpperCase(),
+        upi_id: ownerForm.upi_id.trim(),
+        notes: ownerForm.notes.trim(),
+        user_id: ownerForm.user_id.trim() || null,
+      };
+      const saved = await saveOwner(payload);
+      setOwners(prev => {
+        const idx = prev.findIndex(o => o.id === saved.id);
+        return idx >= 0 ? prev.map(o => o.id === saved.id ? saved : o) : [...prev, saved];
+      });
+      setShowOwnerForm(false); setEditingOwner(null); setOwnerForm(EMPTY_OWNER_FORM);
+    } catch (err) {
+      setOwnerFormError(err?.message || 'Failed to save owner.');
+    } finally { setOwnerSaving(false); }
+  };
+
+  const handleEditOwner = (o) => {
+    setEditingOwner(o);
+    setOwnerForm({
+      name: o.name, email: o.email, phone: o.phone || '',
+      commission_percent: String(o.commission_percent),
+      bank_name: o.bank_name || '', account_number: o.account_number || '',
+      ifsc_code: o.ifsc_code || '', upi_id: o.upi_id || '',
+      notes: o.notes || '', user_id: o.user_id || '',
+    });
+    setOwnerFormError(''); setShowOwnerForm(true);
+  };
+
+  const handleDeleteOwner = async (id) => {
+    if (!window.confirm('Delete this owner? Their properties will be unlinked.')) return;
+    setDeletingOwnerId(id);
+    try { await deleteOwner(id); setOwners(prev => prev.filter(o => o.id !== id)); } catch {}
+    finally { setDeletingOwnerId(null); }
+  };
+
+  // ── Payout handlers ──
+  const computePayoutAmounts = async () => {
+    const { owner_id, period_start, period_end } = payoutForm;
+    if (!owner_id || !period_start || !period_end) return;
+    setComputingPayout(true);
+    try {
+      const owner = owners.find(o => o.id === owner_id);
+      const commission = owner?.commission_percent ?? 10;
+      const props = await getOwnerProperties(owner_id);
+      const bkgs = props.length ? await getOwnerBookings(props.map(p => p.id)) : [];
+      const eligible = bkgs.filter(b => {
+        if (b.status !== 'completed' || !b.checkout_date) return false;
+        return b.checkout_date >= period_start && b.checkout_date <= period_end;
+      });
+      const gross = eligible.reduce((s, b) => s + (b.total || 0), 0);
+      const commAmt = Math.round(gross * commission / 100);
+      setPayoutForm(f => ({
+        ...f,
+        gross_amount: String(gross),
+        commission_amount: String(commAmt),
+        net_amount: String(gross - commAmt),
+        booking_count: String(eligible.length),
+      }));
+    } catch {} finally { setComputingPayout(false); }
+  };
+
+  const handlePayoutSubmit = async (e) => {
+    e.preventDefault();
+    if (!payoutForm.owner_id || !payoutForm.period_label || !payoutForm.period_start || !payoutForm.period_end) {
+      setPayoutFormError('Owner, period label, and dates are required.'); return;
+    }
+    setPayoutFormError(''); setPayoutSaving(true);
+    try {
+      const saved = await savePayout({
+        owner_id: payoutForm.owner_id,
+        period_label: payoutForm.period_label.trim(),
+        period_start: payoutForm.period_start,
+        period_end: payoutForm.period_end,
+        gross_amount: parseFloat(payoutForm.gross_amount) || 0,
+        commission_amount: parseFloat(payoutForm.commission_amount) || 0,
+        net_amount: parseFloat(payoutForm.net_amount) || 0,
+        booking_count: parseInt(payoutForm.booking_count) || 0,
+        notes: payoutForm.notes.trim(),
+        status: 'pending',
+      });
+      setAllPayouts(prev => [saved, ...prev]);
+      setShowPayoutForm(false); setPayoutForm(EMPTY_PAYOUT_FORM);
+    } catch (err) {
+      setPayoutFormError(err?.message || 'Failed to save payout.');
+    } finally { setPayoutSaving(false); }
+  };
+
+  const handleMarkPaid = async (payoutId) => {
+    setMarkingPaidId(payoutId);
+    try {
+      const updated = await markPayoutPaid(payoutId, markPaidForm);
+      setAllPayouts(prev => prev.map(p => p.id === payoutId ? { ...p, ...updated } : p));
+      setMarkingPaidId(null); setMarkPaidForm({ payment_method: 'upi', transaction_ref: '', notes: '' });
+    } catch { setMarkingPaidId(null); }
+  };
 
   const handleStatusChange = async (bookingId, newStatus) => {
     setUpdatingId(bookingId);
@@ -254,6 +414,7 @@ const OwnerDashboard = () => {
       is_featured: p.is_featured || false,
       discount_percent: p.discount_percent || 0,
       deal_label: p.deal_label || '',
+      owner_id: p.owner_id || '',
     });
     setPropError('');
     setShowPropForm(true);
@@ -289,6 +450,7 @@ const OwnerDashboard = () => {
         is_featured: propForm.is_featured,
         discount_percent: propForm.is_featured ? (parseInt(propForm.discount_percent, 10) || 0) : 0,
         deal_label: propForm.is_featured ? propForm.deal_label.trim() : '',
+        owner_id: propForm.owner_id || null,
       };
       if (editingProp) {
         const updated = await updateProperty(editingProp.id, propertyData);
@@ -368,6 +530,17 @@ const OwnerDashboard = () => {
   useEffect(() => {
     if (isAdmin && activeTab === 'promos') fetchPromos();
   }, [isAdmin, activeTab, fetchPromos]);
+
+  useEffect(() => {
+    if (isAdmin && activeTab === 'owners') fetchOwners();
+  }, [isAdmin, activeTab, fetchOwners]);
+
+  useEffect(() => {
+    if (isAdmin && activeTab === 'payouts') {
+      fetchPayoutsAdmin();
+      if (!owners.length) fetchOwners();
+    }
+  }, [isAdmin, activeTab, fetchPayoutsAdmin, fetchOwners, owners.length]);
 
   const handleAddPromo = async (e) => {
     e.preventDefault();
@@ -500,6 +673,8 @@ const OwnerDashboard = () => {
     { id: 'bookings', label: 'All Bookings', icon: Users },
     { id: 'properties', label: 'Properties', icon: Home },
     { id: 'guests', label: 'Guest History', icon: Calendar },
+    { id: 'owners', label: 'Property Owners', icon: UserCheck },
+    { id: 'payouts', label: 'Payouts', icon: Banknote },
     { id: 'qa', label: 'Q&A', icon: HelpCircle },
     { id: 'messages', label: `Messages${messages.length ? ` (${messages.length})` : ''}`, icon: Mail },
     { id: 'channels', label: 'Channel Manager', icon: Globe },
@@ -865,6 +1040,20 @@ const OwnerDashboard = () => {
                         className={inputCls}
                       />
                     </div>
+                    {/* Property Owner */}
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>Property Owner <span className="normal-case text-gray-400 font-normal">(optional — leave blank for platform-owned)</span></label>
+                      <select
+                        value={propForm.owner_id}
+                        onChange={e => setPropForm(f => ({ ...f, owner_id: e.target.value }))}
+                        className={inputCls}
+                      >
+                        <option value="">— Platform Owned (no commission split) —</option>
+                        {owners.map(o => (
+                          <option key={o.id} value={o.id}>{o.name} ({o.email}) · {o.commission_percent}% commission</option>
+                        ))}
+                      </select>
+                    </div>
                     {/* Flash Deal */}
                     <div className="sm:col-span-2">
                       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
@@ -1097,6 +1286,368 @@ const OwnerDashboard = () => {
                       </div>
                     )}
                     </React.Fragment>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Property Owners Tab ── */}
+        {activeTab === 'owners' && (
+          <div className="space-y-4">
+            {showOwnerForm && (
+              <div className="bg-white rounded-2xl border border-golden/30 shadow-md p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="font-bold text-charcoal text-base">
+                    {editingOwner ? 'Edit Owner' : 'Add New Owner'}
+                  </h2>
+                  <button onClick={() => { setShowOwnerForm(false); setEditingOwner(null); setOwnerForm(EMPTY_OWNER_FORM); }} className="p-2 hover:bg-gray-100 rounded-lg transition">
+                    <X size={18} className="text-gray-400" />
+                  </button>
+                </div>
+                <form onSubmit={handleOwnerFormSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelCls}>Full Name *</label>
+                      <input type="text" value={ownerForm.name} onChange={e => setOwnerForm(f => ({ ...f, name: e.target.value }))} className={inputCls} placeholder="e.g. Rahul Sharma" required />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Email *</label>
+                      <input type="email" value={ownerForm.email} onChange={e => setOwnerForm(f => ({ ...f, email: e.target.value }))} className={inputCls} placeholder="owner@email.com" required />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Phone</label>
+                      <input type="tel" value={ownerForm.phone} onChange={e => setOwnerForm(f => ({ ...f, phone: e.target.value }))} className={inputCls} placeholder="+91 98765 43210" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Commission % *</label>
+                      <input type="number" min="0" max="50" step="0.5" value={ownerForm.commission_percent} onChange={e => setOwnerForm(f => ({ ...f, commission_percent: e.target.value }))} className={inputCls} required />
+                      <p className="text-xs text-gray-400 mt-1">Platform keeps this %. Owner receives the remainder.</p>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Supabase User ID <span className="normal-case text-gray-400 font-normal">(optional — for portal access)</span></label>
+                      <input type="text" value={ownerForm.user_id} onChange={e => setOwnerForm(f => ({ ...f, user_id: e.target.value }))} className={inputCls} placeholder="UUID from auth.users" />
+                      <p className="text-xs text-gray-400 mt-1">Link their login so they can access /owner-portal.</p>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Bank Name</label>
+                      <input type="text" value={ownerForm.bank_name} onChange={e => setOwnerForm(f => ({ ...f, bank_name: e.target.value }))} className={inputCls} placeholder="e.g. HDFC Bank" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Account Number</label>
+                      <input type="text" value={ownerForm.account_number} onChange={e => setOwnerForm(f => ({ ...f, account_number: e.target.value }))} className={inputCls} placeholder="Bank account number" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>IFSC Code</label>
+                      <input type="text" value={ownerForm.ifsc_code} onChange={e => setOwnerForm(f => ({ ...f, ifsc_code: e.target.value.toUpperCase() }))} className={inputCls} placeholder="e.g. HDFC0001234" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>UPI ID</label>
+                      <input type="text" value={ownerForm.upi_id} onChange={e => setOwnerForm(f => ({ ...f, upi_id: e.target.value }))} className={inputCls} placeholder="e.g. rahul@upi" />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>Internal Notes</label>
+                      <textarea rows={2} value={ownerForm.notes} onChange={e => setOwnerForm(f => ({ ...f, notes: e.target.value }))} className={inputCls + ' resize-none'} placeholder="Any notes about this owner or agreement…" />
+                    </div>
+                  </div>
+                  {ownerFormError && <p className="text-red-500 text-sm">{ownerFormError}</p>}
+                  <div className="flex gap-3 pt-2">
+                    <button type="submit" disabled={ownerSaving}
+                      className="flex items-center gap-2 bg-golden hover:bg-golden-dark text-white font-bold px-6 py-2.5 rounded-xl transition text-sm disabled:opacity-60"
+                    >
+                      {ownerSaving && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
+                      {ownerSaving ? 'Saving…' : editingOwner ? 'Save Changes' : 'Add Owner'}
+                    </button>
+                    <button type="button" onClick={() => { setShowOwnerForm(false); setEditingOwner(null); setOwnerForm(EMPTY_OWNER_FORM); }}
+                      className="text-sm font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 px-6 py-2.5 rounded-xl transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="font-bold text-charcoal flex items-center gap-2 text-base">
+                  <UserCheck size={16} className="text-golden" /> Property Owners
+                  {!ownersLoading && <span className="ml-1 bg-golden text-white text-xs font-bold px-2 py-0.5 rounded-full">{owners.length}</span>}
+                </h2>
+                {!showOwnerForm && (
+                  <button onClick={() => { setShowOwnerForm(true); setEditingOwner(null); setOwnerForm(EMPTY_OWNER_FORM); setOwnerFormError(''); }}
+                    className="flex items-center gap-2 bg-golden hover:bg-golden-dark text-white text-sm font-bold px-4 py-2 rounded-full transition"
+                  >
+                    <Plus size={14} /> Add Owner
+                  </button>
+                )}
+              </div>
+              {ownersLoading ? (
+                <div className="p-14 flex items-center justify-center">
+                  <svg className="animate-spin h-7 w-7 text-golden" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>
+                </div>
+              ) : owners.length === 0 ? (
+                <div className="p-14 text-center">
+                  <UserCheck size={36} className="text-gray-200 mx-auto mb-3" />
+                  <p className="text-gray-400 text-sm">No property owners yet.</p>
+                  <p className="text-gray-400 text-xs mt-1">Add owners to enable the commission marketplace system.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {owners.map(o => {
+                    const ownerProps = propertiesData.filter(p => p.owner_id === o.id);
+                    return (
+                      <div key={o.id} className="p-5 hover:bg-gray-50/50 transition">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-bold text-charcoal">{o.name}</p>
+                              <span className="text-xs font-bold text-golden bg-golden/10 border border-golden/20 px-2 py-0.5 rounded-full">{o.commission_percent}% commission</span>
+                              {o.user_id && <span className="text-xs text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">Portal Access</span>}
+                            </div>
+                            <p className="text-gray-400 text-xs">{o.email}{o.phone && ` · ${o.phone}`}</p>
+                            <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">
+                              {o.bank_name && <span>🏦 {o.bank_name}</span>}
+                              {o.upi_id && <span>📲 {o.upi_id}</span>}
+                              {o.ifsc_code && <span>IFSC: {o.ifsc_code}</span>}
+                            </div>
+                            {ownerProps.length > 0 && (
+                              <p className="text-xs text-blue-600 mt-2">
+                                {ownerProps.length} propert{ownerProps.length !== 1 ? 'ies' : 'y'}: {ownerProps.map(p => p.title).join(', ')}
+                              </p>
+                            )}
+                            {o.notes && <p className="text-xs text-gray-400 italic mt-1">{o.notes}</p>}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button onClick={() => handleEditOwner(o)} className="p-2 text-gray-400 hover:text-golden hover:bg-golden/10 rounded-lg transition" title="Edit">
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteOwner(o.id)}
+                              disabled={deletingOwnerId === o.id}
+                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
+                              title="Delete"
+                            >
+                              {deletingOwnerId === o.id
+                                ? <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                                : <Trash2 size={15} />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Payouts Tab ── */}
+        {activeTab === 'payouts' && (
+          <div className="space-y-4">
+            {/* Create payout form */}
+            {showPayoutForm && (
+              <div className="bg-white rounded-2xl border border-golden/30 shadow-md p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="font-bold text-charcoal text-base">Create Payout Record</h2>
+                  <button onClick={() => { setShowPayoutForm(false); setPayoutForm(EMPTY_PAYOUT_FORM); }} className="p-2 hover:bg-gray-100 rounded-lg transition">
+                    <X size={18} className="text-gray-400" />
+                  </button>
+                </div>
+                <form onSubmit={handlePayoutSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelCls}>Owner *</label>
+                      <select value={payoutForm.owner_id} onChange={e => setPayoutForm(f => ({ ...f, owner_id: e.target.value }))} className={inputCls} required>
+                        <option value="">— Select Owner —</option>
+                        {owners.map(o => <option key={o.id} value={o.id}>{o.name} ({o.commission_percent}%)</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Period Label *</label>
+                      <input type="text" placeholder="e.g. June 2025" value={payoutForm.period_label}
+                        onChange={e => setPayoutForm(f => ({ ...f, period_label: e.target.value }))}
+                        className={inputCls} required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Period Start *</label>
+                      <input type="date" value={payoutForm.period_start}
+                        onChange={e => setPayoutForm(f => ({ ...f, period_start: e.target.value }))}
+                        className={inputCls} required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Period End *</label>
+                      <input type="date" value={payoutForm.period_end}
+                        onChange={e => setPayoutForm(f => ({ ...f, period_end: e.target.value }))}
+                        className={inputCls} required
+                      />
+                    </div>
+                  </div>
+                  <button type="button" onClick={computePayoutAmounts} disabled={computingPayout || !payoutForm.owner_id || !payoutForm.period_start || !payoutForm.period_end}
+                    className="flex items-center gap-2 text-sm font-bold text-golden border border-golden/30 hover:bg-golden/5 px-4 py-2 rounded-full transition disabled:opacity-50"
+                  >
+                    {computingPayout ? <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> : <RefreshCw size={14} />}
+                    {computingPayout ? 'Computing…' : 'Auto-compute from completed bookings'}
+                  </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className={labelCls}>Gross Amount (₹)</label>
+                      <input type="number" min="0" value={payoutForm.gross_amount}
+                        onChange={e => setPayoutForm(f => ({ ...f, gross_amount: e.target.value }))}
+                        className={inputCls} placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Commission Deducted (₹)</label>
+                      <input type="number" min="0" value={payoutForm.commission_amount}
+                        onChange={e => setPayoutForm(f => ({ ...f, commission_amount: e.target.value }))}
+                        className={inputCls} placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Net to Owner (₹)</label>
+                      <input type="number" min="0" value={payoutForm.net_amount}
+                        onChange={e => setPayoutForm(f => ({ ...f, net_amount: e.target.value }))}
+                        className={inputCls} placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Booking Count</label>
+                      <input type="number" min="0" value={payoutForm.booking_count}
+                        onChange={e => setPayoutForm(f => ({ ...f, booking_count: e.target.value }))}
+                        className={inputCls} placeholder="0"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>Notes</label>
+                      <input type="text" value={payoutForm.notes}
+                        onChange={e => setPayoutForm(f => ({ ...f, notes: e.target.value }))}
+                        className={inputCls} placeholder="Optional notes…"
+                      />
+                    </div>
+                  </div>
+                  {payoutFormError && <p className="text-red-500 text-sm">{payoutFormError}</p>}
+                  <div className="flex gap-3 pt-2">
+                    <button type="submit" disabled={payoutSaving}
+                      className="flex items-center gap-2 bg-golden hover:bg-golden-dark text-white font-bold px-6 py-2.5 rounded-xl transition text-sm disabled:opacity-60"
+                    >
+                      {payoutSaving && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
+                      {payoutSaving ? 'Saving…' : 'Create Payout Record'}
+                    </button>
+                    <button type="button" onClick={() => { setShowPayoutForm(false); setPayoutForm(EMPTY_PAYOUT_FORM); }}
+                      className="text-sm font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 px-6 py-2.5 rounded-xl transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="font-bold text-charcoal flex items-center gap-2 text-base">
+                  <Banknote size={16} className="text-golden" /> Payout Records
+                  {!payoutsLoading && <span className="ml-1 bg-golden text-white text-xs font-bold px-2 py-0.5 rounded-full">{allPayouts.length}</span>}
+                </h2>
+                {!showPayoutForm && (
+                  <button onClick={() => { setShowPayoutForm(true); setPayoutFormError(''); setPayoutForm(EMPTY_PAYOUT_FORM); }}
+                    className="flex items-center gap-2 bg-golden hover:bg-golden-dark text-white text-sm font-bold px-4 py-2 rounded-full transition"
+                  >
+                    <Plus size={14} /> New Payout
+                  </button>
+                )}
+              </div>
+              {payoutsLoading ? (
+                <div className="p-14 flex items-center justify-center">
+                  <svg className="animate-spin h-7 w-7 text-golden" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>
+                </div>
+              ) : allPayouts.length === 0 ? (
+                <div className="p-14 text-center">
+                  <Banknote size={36} className="text-gray-200 mx-auto mb-3" />
+                  <p className="text-gray-400 text-sm">No payouts yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-0 divide-y divide-gray-50">
+                  {allPayouts.map(p => (
+                    <div key={p.id} className="p-5 hover:bg-gray-50/50 transition">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <p className="font-bold text-charcoal">{p.property_owners?.name || '—'}</p>
+                            <span className="text-xs text-gray-400">·</span>
+                            <p className="text-sm font-semibold text-charcoal">{p.period_label}</p>
+                            {p.status === 'paid' ? (
+                              <span className="flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                                <CheckCircle size={10} /> Paid
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-xs font-bold text-yellow-600 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded-full">
+                                <Clock size={10} /> Pending
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-4 text-xs text-gray-500 mt-1">
+                            <span>Gross: <span className="font-semibold text-charcoal">₹{Number(p.gross_amount).toLocaleString('en-IN')}</span></span>
+                            <span>Commission: <span className="font-semibold text-red-400">−₹{Number(p.commission_amount).toLocaleString('en-IN')}</span></span>
+                            <span>Net: <span className="font-bold text-green-600">₹{Number(p.net_amount).toLocaleString('en-IN')}</span></span>
+                            <span>{p.booking_count} booking{p.booking_count !== 1 ? 's' : ''}</span>
+                          </div>
+                          {p.status === 'paid' && p.payment_method && (
+                            <p className="text-xs text-gray-400 mt-1">
+                              via {p.payment_method}{p.transaction_ref && ` · Ref: ${p.transaction_ref}`}
+                              {p.paid_at && ` · Paid on ${fmtDate(p.paid_at)}`}
+                            </p>
+                          )}
+                          {p.notes && <p className="text-xs text-gray-400 italic mt-1">{p.notes}</p>}
+                        </div>
+                        {p.status === 'pending' && (
+                          <div className="shrink-0">
+                            {markingPaidId === p.id ? (
+                              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2 w-64">
+                                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Mark as Paid</p>
+                                <select value={markPaidForm.payment_method}
+                                  onChange={e => setMarkPaidForm(f => ({ ...f, payment_method: e.target.value }))}
+                                  className="w-full text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-golden/40"
+                                >
+                                  <option value="upi">UPI</option>
+                                  <option value="bank_transfer">Bank Transfer</option>
+                                  <option value="cash">Cash</option>
+                                </select>
+                                <input type="text" placeholder="Transaction ref / UTR" value={markPaidForm.transaction_ref}
+                                  onChange={e => setMarkPaidForm(f => ({ ...f, transaction_ref: e.target.value }))}
+                                  className="w-full text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-golden/40"
+                                />
+                                <input type="text" placeholder="Notes (optional)" value={markPaidForm.notes}
+                                  onChange={e => setMarkPaidForm(f => ({ ...f, notes: e.target.value }))}
+                                  className="w-full text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-golden/40"
+                                />
+                                <div className="flex gap-2">
+                                  <button onClick={() => handleMarkPaid(p.id)}
+                                    className="flex-1 flex items-center justify-center gap-1 text-xs font-bold bg-green-500 hover:bg-green-600 text-white py-1.5 rounded-lg transition"
+                                  >
+                                    <Send size={11} /> Confirm
+                                  </button>
+                                  <button onClick={() => setMarkingPaidId(null)} className="text-xs text-gray-500 border border-gray-200 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition">
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button onClick={() => { setMarkingPaidId(p.id); setMarkPaidForm({ payment_method: 'upi', transaction_ref: '', notes: '' }); }}
+                                className="flex items-center gap-2 text-sm font-bold text-green-600 border border-green-200 bg-green-50 hover:bg-green-100 px-4 py-2 rounded-full transition"
+                              >
+                                <CheckCircle size={14} /> Mark Paid
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

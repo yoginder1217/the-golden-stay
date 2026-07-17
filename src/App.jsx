@@ -25,6 +25,7 @@ import NotFound from './pages/NotFound';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
 import OwnerDashboard from './pages/OwnerDashboard';
+import OwnerPortal from './pages/OwnerPortal';
 import Wishlist from './pages/Wishlist';
 import Profile from './pages/Profile';
 import RefundPolicy from './pages/RefundPolicy';
@@ -62,6 +63,11 @@ function RoutedMain() {
               <Route path="/owner" element={
                 <ProtectedRoute>
                   <OwnerDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/owner-portal" element={
+                <ProtectedRoute>
+                  <OwnerPortal />
                 </ProtectedRoute>
               } />
               <Route path="/wishlist" element={

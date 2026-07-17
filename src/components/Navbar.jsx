@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContextUtils';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, LayoutDashboard, ChevronDown, ShieldCheck, Heart, UserCog, Bell, CalendarDays, Home, Award, Moon, Sun } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, ChevronDown, ShieldCheck, Heart, UserCog, Bell, CalendarDays, Home, Award, Moon, Sun, Building2 } from 'lucide-react';
 import { getNotifications, markAllRead, markRead } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
+import { getMyOwnerProfile } from '../lib/owners';
 
 const formatTime = (iso) => {
   const d = new Date(iso);
@@ -60,6 +61,12 @@ const Navbar = () => {
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Account';
   const isAdmin = user?.email === import.meta.env.VITE_ADMIN_EMAIL;
+
+  const [ownerProfile, setOwnerProfile] = useState(null);
+  useEffect(() => {
+    if (!user || isAdmin) { setOwnerProfile(null); return; }
+    getMyOwnerProfile(user.id).then(setOwnerProfile).catch(() => {});
+  }, [user, isAdmin]);
 
   // Load notifications and subscribe to real-time inserts
   useEffect(() => {
@@ -272,6 +279,15 @@ const Navbar = () => {
                     >
                       <Award size={16} /> My Rewards
                     </Link>
+                    {ownerProfile && !isAdmin && (
+                      <Link
+                        to="/owner-portal"
+                        onClick={closeMenu}
+                        className="flex items-center gap-2 px-4 py-3 text-sm text-blue-600 font-bold hover:bg-blue-50 transition border-t border-gray-100"
+                      >
+                        <Building2 size={16} /> My Portal
+                      </Link>
+                    )}
                     {isAdmin && (
                       <Link
                         to="/owner"
@@ -402,6 +418,11 @@ const Navbar = () => {
                   <Link to="/profile" onClick={closeMenu} className="flex items-center gap-2 px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:text-golden hover:bg-gray-50">
                     <UserCog size={18} /> Edit Profile
                   </Link>
+                  {ownerProfile && !isAdmin && (
+                    <Link to="/owner-portal" onClick={closeMenu} className="flex items-center gap-2 px-3 py-3 rounded-md text-base font-bold text-blue-600 hover:bg-blue-50">
+                      <Building2 size={18} /> My Portal
+                    </Link>
+                  )}
                   {isAdmin && (
                     <Link to="/owner" onClick={closeMenu} className="flex items-center gap-2 px-3 py-3 rounded-md text-base font-bold text-golden hover:bg-golden/5">
                       <ShieldCheck size={18} /> Owner Dashboard
