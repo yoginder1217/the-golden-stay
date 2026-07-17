@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPropertyById, getProperties } from '../lib/properties';
 import { calculateDynamicPricing } from '../lib/pricing';
-import { Wifi, Home, Star, MapPin, CheckCircle, ExternalLink, ArrowRight, Users, Calendar, MessageSquare, LogIn, Share2, HelpCircle, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, Images, AirVent, Utensils, UtensilsCrossed, Car, Waves, Dumbbell, Tv, Monitor, Zap, Leaf, Trees, Droplets, Flame, Laptop, Bell, Eye, User, Building2, Train } from 'lucide-react';
+import { Wifi, Home, Star, MapPin, CheckCircle, ExternalLink, ArrowRight, Users, Calendar, MessageSquare, LogIn, Share2, HelpCircle, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, Images, AirVent, Utensils, UtensilsCrossed, Car, Waves, Dumbbell, Tv, Monitor, Zap, Leaf, Trees, Droplets, Flame, Laptop, Bell, Eye, User, Building2, Train, Clock, Shield } from 'lucide-react';
 import { getPropertyQA, askQuestion } from '../lib/qa';
 import { Helmet } from 'react-helmet-async';
 import WishlistButton from '../components/WishlistButton';
@@ -375,6 +375,19 @@ const PropertyDetails = () => {
                 >
                   <Share2 size={12} /> Share on WhatsApp
                 </a>
+              </div>
+
+              {/* Trust signals */}
+              <div className="flex flex-wrap gap-2 mt-3">
+                <span className="flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+                  <Zap size={11} /> Instant Booking
+                </span>
+                <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-full">
+                  <Clock size={11} /> Responds within 1 hour
+                </span>
+                <span className="flex items-center gap-1.5 text-xs font-bold text-golden-dark bg-golden/10 border border-golden/20 px-2.5 py-1 rounded-full">
+                  <Shield size={11} /> Verified Property
+                </span>
               </div>
             </div>
             <div className="text-center bg-gray-50 px-4 py-2 rounded-lg border border-gray-200 shrink-0">

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Instagram, Facebook, Twitter } from 'lucide-react';
 import { useSiteContent } from '../context/SiteContentContext';
 
 const Footer = () => {
@@ -14,6 +15,17 @@ const Footer = () => {
           <p className="text-gray-400 text-sm leading-relaxed">
             {c('footer.tagline')}
           </p>
+          <div className="flex gap-3 mt-5">
+            <a href="#" aria-label="Instagram" className="p-2.5 bg-white/5 rounded-full text-gray-400 hover:bg-golden hover:text-charcoal transition">
+              <Instagram size={17} />
+            </a>
+            <a href="#" aria-label="Facebook" className="p-2.5 bg-white/5 rounded-full text-gray-400 hover:bg-golden hover:text-charcoal transition">
+              <Facebook size={17} />
+            </a>
+            <a href="#" aria-label="Twitter / X" className="p-2.5 bg-white/5 rounded-full text-gray-400 hover:bg-golden hover:text-charcoal transition">
+              <Twitter size={17} />
+            </a>
+          </div>
         </div>
 
         <div>

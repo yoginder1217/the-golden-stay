@@ -99,6 +99,7 @@ const PropertyCard = ({ property }) => {
             )}
           </div>
         )}
+        <p className="text-[10px] text-gray-400 mt-2">Excl. cleaning &amp; service fees</p>
       </div>
     </Link>
   );
