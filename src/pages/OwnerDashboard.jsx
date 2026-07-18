@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../context/AuthContextUtils';
 import { getAllBookings, updateBookingStatus } from '../lib/adminBookings';
@@ -85,6 +85,7 @@ const OwnerDashboard = () => {
   const [propForm, setPropForm] = useState(EMPTY_PROP_FORM);
   const [propSaving, setPropSaving] = useState(false);
   const [propError, setPropError] = useState('');
+  const editFormRef = useRef(null);
   const [deletingPropId, setDeletingPropId] = useState(null);
 
   // Image upload
@@ -787,6 +788,336 @@ const OwnerDashboard = () => {
   const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-golden/40';
   const labelCls = 'block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1';
 
+  // Scroll the inline edit form into view whenever a property is opened for editing
+  useEffect(() => {
+    if (editingProp) {
+      setTimeout(() => editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60);
+    }
+  }, [editingProp?.id]);
+
+  const renderPropFormContent = () => (
+    <>
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="font-bold text-charcoal text-base">
+          {editingProp ? 'Edit Property' : 'Add New Property'}
+        </h2>
+        <button
+          onClick={() => { setShowPropForm(false); setEditingProp(null); setPropForm(EMPTY_PROP_FORM); }}
+          className="p-2 hover:bg-gray-100 rounded-lg transition"
+        >
+          <X size={18} className="text-gray-400" />
+        </button>
+      </div>
+      <form onSubmit={handlePropFormSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Property Title *</label>
+            <input
+              type="text"
+              placeholder="e.g. Golden Heights 3BHK Family Suite"
+              value={propForm.title}
+              onChange={e => setPropForm(f => ({ ...f, title: e.target.value }))}
+              className={inputCls}
+              required
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Type *</label>
+            <select
+              value={propForm.type}
+              onChange={e => setPropForm(f => ({ ...f, type: e.target.value }))}
+              className={inputCls}
+            >
+              <option value="1BHK">1BHK</option>
+              <option value="2BHK">2BHK</option>
+              <option value="3BHK">3BHK</option>
+              <option value="Villa">Villa</option>
+              <option value="Cottage">Cottage</option>
+              <option value="Farmhouse">Farmhouse</option>
+              <option value="Studio">Studio</option>
+              <option value="Penthouse">Penthouse</option>
+              <option value="Bungalow">Bungalow</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Price per Night (₹) *</label>
+            <input
+              type="number"
+              placeholder="e.g. 4500"
+              min="100"
+              value={propForm.price}
+              onChange={e => setPropForm(f => ({ ...f, price: e.target.value }))}
+              className={inputCls}
+              required
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Weekend Premium (%)</label>
+            <input
+              type="number"
+              placeholder="e.g. 20"
+              min="0"
+              max="100"
+              value={propForm.weekend_premium}
+              onChange={e => setPropForm(f => ({ ...f, weekend_premium: e.target.valueAsNumber || 0 }))}
+              className={inputCls}
+            />
+            <p className="text-xs text-gray-400 mt-1">0 = flat rate. e.g. 20 = 20% more on Fri &amp; Sat nights.</p>
+          </div>
+          <div>
+            <label className={labelCls}>Min Stay (nights)</label>
+            <input
+              type="number"
+              placeholder="1"
+              min="1"
+              max="30"
+              value={propForm.min_nights}
+              onChange={e => setPropForm(f => ({ ...f, min_nights: e.target.valueAsNumber || 1 }))}
+              className={inputCls}
+            />
+            <p className="text-xs text-gray-400 mt-1">Minimum nights a guest must book.</p>
+          </div>
+          <div>
+            <label className={labelCls}>City *</label>
+            <input
+              type="text"
+              placeholder="e.g. Noida"
+              value={propForm.city}
+              onChange={e => setPropForm(f => ({ ...f, city: e.target.value }))}
+              className={inputCls}
+              required
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Location / Area *</label>
+            <input
+              type="text"
+              placeholder="e.g. Sector 62, Noida"
+              value={propForm.location}
+              onChange={e => setPropForm(f => ({ ...f, location: e.target.value }))}
+              className={inputCls}
+              required
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Cover Image</label>
+            <div className="flex gap-3 items-start">
+              {propForm.image && (
+                <div className="w-20 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-100 border border-gray-200">
+                  <img src={propForm.image} alt="Preview" className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="flex-1 space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer border-2 border-dashed border-gray-200 hover:border-golden rounded-xl px-4 py-3 transition text-sm text-gray-500 hover:text-golden">
+                  {imageUploading ? (
+                    <svg className="animate-spin h-4 w-4 text-golden" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                  ) : <Upload size={15} />}
+                  {imageUploading ? 'Uploading…' : 'Upload image'}
+                  <input type="file" accept="image/*" className="sr-only" disabled={imageUploading}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 5 * 1024 * 1024) { setImageUploadError('Max file size is 5 MB.'); return; }
+                      setImageUploading(true); setImageUploadError('');
+                      try {
+                        const url = await uploadPropertyImage(file);
+                        setPropForm(f => ({ ...f, image: url }));
+                      } catch (err) {
+                        setImageUploadError(err?.message || 'Upload failed.');
+                      } finally {
+                        setImageUploading(false);
+                      }
+                    }}
+                  />
+                </label>
+                <input
+                  type="url"
+                  placeholder="Or paste image URL"
+                  value={propForm.image}
+                  onChange={e => setPropForm(f => ({ ...f, image: e.target.value }))}
+                  className={inputCls}
+                />
+                {imageUploadError && <p className="text-red-500 text-xs">{imageUploadError}</p>}
+              </div>
+            </div>
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Additional Photos <span className="normal-case text-gray-400 font-normal">(gallery)</span></label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {propForm.images.map((url, i) => (
+                <div key={i} className="relative w-16 h-12 rounded-lg overflow-hidden border border-gray-200 group">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <button type="button"
+                    onClick={() => setPropForm(f => ({ ...f, images: f.images.filter((_, j) => j !== i) }))}
+                    className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
+                  >
+                    <X size={12} className="text-white" />
+                  </button>
+                </div>
+              ))}
+              <label className="w-16 h-12 border-2 border-dashed border-gray-200 hover:border-golden rounded-lg flex items-center justify-center cursor-pointer transition">
+                {imageUploading ? (
+                  <svg className="animate-spin h-4 w-4 text-golden" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg>
+                ) : <ImageIcon size={16} className="text-gray-300 group-hover:text-golden" />}
+                <input type="file" accept="image/*" multiple className="sr-only" disabled={imageUploading}
+                  onChange={async (e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (!files.length) return;
+                    setImageUploading(true); setImageUploadError('');
+                    try {
+                      const urls = await Promise.all(files.map(f => uploadPropertyImage(f)));
+                      setPropForm(f => ({ ...f, images: [...f.images, ...urls] }));
+                    } catch (err) {
+                      setImageUploadError(err?.message || 'Upload failed.');
+                    } finally { setImageUploading(false); }
+                  }}
+                />
+              </label>
+            </div>
+            <p className="text-xs text-gray-400">Upload up to 10 photos. First photo is the cover.</p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Description</label>
+            <textarea
+              placeholder="Describe the property, highlights, and nearby attractions…"
+              value={propForm.description}
+              onChange={e => setPropForm(f => ({ ...f, description: e.target.value }))}
+              rows={3}
+              className={inputCls + ' resize-none'}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Amenities (comma-separated)</label>
+            <input
+              type="text"
+              placeholder="WiFi, AC, Kitchen, Parking, TV, Washer"
+              value={propForm.amenities}
+              onChange={e => setPropForm(f => ({ ...f, amenities: e.target.value }))}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Airbnb URL</label>
+            <input
+              type="url"
+              placeholder="https://www.airbnb.com/rooms/…"
+              value={propForm.airbnb}
+              onChange={e => setPropForm(f => ({ ...f, airbnb: e.target.value }))}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>MakeMyTrip URL</label>
+            <input
+              type="url"
+              placeholder="https://www.makemytrip.com/…"
+              value={propForm.mmt}
+              onChange={e => setPropForm(f => ({ ...f, mmt: e.target.value }))}
+              className={inputCls}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Goibibo URL</label>
+            <input
+              type="url"
+              placeholder="https://www.goibibo.com/…"
+              value={propForm.goibibo}
+              onChange={e => setPropForm(f => ({ ...f, goibibo: e.target.value }))}
+              className={inputCls}
+            />
+          </div>
+          {/* Property Owner */}
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Property Owner <span className="normal-case text-gray-400 font-normal">(optional — leave blank for platform-owned)</span></label>
+            <select
+              value={propForm.owner_id}
+              onChange={e => setPropForm(f => ({ ...f, owner_id: e.target.value }))}
+              className={inputCls}
+            >
+              <option value="">— Platform Owned (no commission split) —</option>
+              {owners.map(o => (
+                <option key={o.id} value={o.id}>{o.name} ({o.email}) · {o.commission_percent}% commission</option>
+              ))}
+            </select>
+          </div>
+          {/* Flash Deal */}
+          <div className="sm:col-span-2">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-xs font-bold text-amber-700 uppercase tracking-wide cursor-pointer">
+                  <Zap size={14} className="text-amber-500" /> Flash Deal
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setPropForm(f => ({ ...f, is_featured: !f.is_featured }))}
+                  className="text-amber-600"
+                >
+                  {propForm.is_featured
+                    ? <ToggleRight size={28} className="text-amber-500" />
+                    : <ToggleLeft size={28} className="text-gray-400" />}
+                </button>
+              </div>
+              {propForm.is_featured && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Discount (%)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 20"
+                      min="1" max="99"
+                      value={propForm.discount_percent}
+                      onChange={e => setPropForm(f => ({ ...f, discount_percent: e.target.valueAsNumber || 0 }))}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Deal Label</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Weekend Special"
+                      value={propForm.deal_label}
+                      onChange={e => setPropForm(f => ({ ...f, deal_label: e.target.value }))}
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        {propError && <p className="text-red-500 text-sm">{propError}</p>}
+        <div className="flex gap-3 pt-2">
+          <button
+            type="submit"
+            disabled={propSaving}
+            className="flex items-center gap-2 bg-golden hover:bg-golden-dark text-white font-bold px-6 py-2.5 rounded-xl transition text-sm disabled:opacity-60"
+          >
+            {propSaving && (
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+            )}
+            {propSaving ? 'Saving…' : editingProp ? 'Save Changes' : 'Add Property'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowPropForm(false); setEditingProp(null); setPropForm(EMPTY_PROP_FORM); }}
+            className="text-sm font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 px-6 py-2.5 rounded-xl transition"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </>
+  );
+
   return (
     <div className="bg-gray-50 min-h-screen py-10">
       <Helmet><title>Owner Dashboard | The Golden Stay</title></Helmet>
@@ -905,326 +1236,9 @@ const OwnerDashboard = () => {
         {/* Properties Tab */}
         {activeTab === 'properties' && (
           <div className="space-y-4">
-            {showPropForm && (
+            {showPropForm && !editingProp && (
               <div className="bg-white rounded-2xl border border-golden/30 shadow-md p-6">
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="font-bold text-charcoal text-base">
-                    {editingProp ? 'Edit Property' : 'Add New Property'}
-                  </h2>
-                  <button
-                    onClick={() => { setShowPropForm(false); setEditingProp(null); setPropForm(EMPTY_PROP_FORM); }}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition"
-                  >
-                    <X size={18} className="text-gray-400" />
-                  </button>
-                </div>
-                <form onSubmit={handlePropFormSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-2">
-                      <label className={labelCls}>Property Title *</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Golden Heights 3BHK Family Suite"
-                        value={propForm.title}
-                        onChange={e => setPropForm(f => ({ ...f, title: e.target.value }))}
-                        className={inputCls}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Type *</label>
-                      <select
-                        value={propForm.type}
-                        onChange={e => setPropForm(f => ({ ...f, type: e.target.value }))}
-                        className={inputCls}
-                      >
-                        <option value="1BHK">1BHK</option>
-                        <option value="2BHK">2BHK</option>
-                        <option value="3BHK">3BHK</option>
-                        <option value="Villa">Villa</option>
-                        <option value="Cottage">Cottage</option>
-                        <option value="Farmhouse">Farmhouse</option>
-                        <option value="Studio">Studio</option>
-                        <option value="Penthouse">Penthouse</option>
-                        <option value="Bungalow">Bungalow</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Price per Night (₹) *</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 4500"
-                        min="100"
-                        value={propForm.price}
-                        onChange={e => setPropForm(f => ({ ...f, price: e.target.value }))}
-                        className={inputCls}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Weekend Premium (%)</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 20"
-                        min="0"
-                        max="100"
-                        value={propForm.weekend_premium}
-                        onChange={e => setPropForm(f => ({ ...f, weekend_premium: e.target.valueAsNumber || 0 }))}
-                        className={inputCls}
-                      />
-                      <p className="text-xs text-gray-400 mt-1">0 = flat rate. e.g. 20 = 20% more on Fri &amp; Sat nights.</p>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Min Stay (nights)</label>
-                      <input
-                        type="number"
-                        placeholder="1"
-                        min="1"
-                        max="30"
-                        value={propForm.min_nights}
-                        onChange={e => setPropForm(f => ({ ...f, min_nights: e.target.valueAsNumber || 1 }))}
-                        className={inputCls}
-                      />
-                      <p className="text-xs text-gray-400 mt-1">Minimum nights a guest must book.</p>
-                    </div>
-                    <div>
-                      <label className={labelCls}>City *</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Noida"
-                        value={propForm.city}
-                        onChange={e => setPropForm(f => ({ ...f, city: e.target.value }))}
-                        className={inputCls}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Location / Area *</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Sector 62, Noida"
-                        value={propForm.location}
-                        onChange={e => setPropForm(f => ({ ...f, location: e.target.value }))}
-                        className={inputCls}
-                        required
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className={labelCls}>Cover Image</label>
-                      <div className="flex gap-3 items-start">
-                        {propForm.image && (
-                          <div className="w-20 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-100 border border-gray-200">
-                            <img src={propForm.image} alt="Preview" className="w-full h-full object-cover" />
-                          </div>
-                        )}
-                        <div className="flex-1 space-y-2">
-                          <label className="flex items-center gap-2 cursor-pointer border-2 border-dashed border-gray-200 hover:border-golden rounded-xl px-4 py-3 transition text-sm text-gray-500 hover:text-golden">
-                            {imageUploading ? (
-                              <svg className="animate-spin h-4 w-4 text-golden" viewBox="0 0 24 24" fill="none">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                              </svg>
-                            ) : <Upload size={15} />}
-                            {imageUploading ? 'Uploading…' : 'Upload image'}
-                            <input type="file" accept="image/*" className="sr-only" disabled={imageUploading}
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                if (file.size > 5 * 1024 * 1024) { setImageUploadError('Max file size is 5 MB.'); return; }
-                                setImageUploading(true); setImageUploadError('');
-                                try {
-                                  const url = await uploadPropertyImage(file);
-                                  setPropForm(f => ({ ...f, image: url }));
-                                } catch (err) {
-                                  setImageUploadError(err?.message || 'Upload failed.');
-                                } finally {
-                                  setImageUploading(false);
-                                }
-                              }}
-                            />
-                          </label>
-                          <input
-                            type="url"
-                            placeholder="Or paste image URL"
-                            value={propForm.image}
-                            onChange={e => setPropForm(f => ({ ...f, image: e.target.value }))}
-                            className={inputCls}
-                          />
-                          {imageUploadError && <p className="text-red-500 text-xs">{imageUploadError}</p>}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className={labelCls}>Additional Photos <span className="normal-case text-gray-400 font-normal">(gallery)</span></label>
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {propForm.images.map((url, i) => (
-                          <div key={i} className="relative w-16 h-12 rounded-lg overflow-hidden border border-gray-200 group">
-                            <img src={url} alt="" className="w-full h-full object-cover" />
-                            <button type="button"
-                              onClick={() => setPropForm(f => ({ ...f, images: f.images.filter((_, j) => j !== i) }))}
-                              className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition"
-                            >
-                              <X size={12} className="text-white" />
-                            </button>
-                          </div>
-                        ))}
-                        <label className="w-16 h-12 border-2 border-dashed border-gray-200 hover:border-golden rounded-lg flex items-center justify-center cursor-pointer transition">
-                          {imageUploading ? (
-                            <svg className="animate-spin h-4 w-4 text-golden" viewBox="0 0 24 24" fill="none">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                            </svg>
-                          ) : <ImageIcon size={16} className="text-gray-300 group-hover:text-golden" />}
-                          <input type="file" accept="image/*" multiple className="sr-only" disabled={imageUploading}
-                            onChange={async (e) => {
-                              const files = Array.from(e.target.files || []);
-                              if (!files.length) return;
-                              setImageUploading(true); setImageUploadError('');
-                              try {
-                                const urls = await Promise.all(files.map(f => uploadPropertyImage(f)));
-                                setPropForm(f => ({ ...f, images: [...f.images, ...urls] }));
-                              } catch (err) {
-                                setImageUploadError(err?.message || 'Upload failed.');
-                              } finally { setImageUploading(false); }
-                            }}
-                          />
-                        </label>
-                      </div>
-                      <p className="text-xs text-gray-400">Upload up to 10 photos. First photo is the cover.</p>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className={labelCls}>Description</label>
-                      <textarea
-                        placeholder="Describe the property, highlights, and nearby attractions…"
-                        value={propForm.description}
-                        onChange={e => setPropForm(f => ({ ...f, description: e.target.value }))}
-                        rows={3}
-                        className={inputCls + ' resize-none'}
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className={labelCls}>Amenities (comma-separated)</label>
-                      <input
-                        type="text"
-                        placeholder="WiFi, AC, Kitchen, Parking, TV, Washer"
-                        value={propForm.amenities}
-                        onChange={e => setPropForm(f => ({ ...f, amenities: e.target.value }))}
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Airbnb URL</label>
-                      <input
-                        type="url"
-                        placeholder="https://www.airbnb.com/rooms/…"
-                        value={propForm.airbnb}
-                        onChange={e => setPropForm(f => ({ ...f, airbnb: e.target.value }))}
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>MakeMyTrip URL</label>
-                      <input
-                        type="url"
-                        placeholder="https://www.makemytrip.com/…"
-                        value={propForm.mmt}
-                        onChange={e => setPropForm(f => ({ ...f, mmt: e.target.value }))}
-                        className={inputCls}
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className={labelCls}>Goibibo URL</label>
-                      <input
-                        type="url"
-                        placeholder="https://www.goibibo.com/…"
-                        value={propForm.goibibo}
-                        onChange={e => setPropForm(f => ({ ...f, goibibo: e.target.value }))}
-                        className={inputCls}
-                      />
-                    </div>
-                    {/* Property Owner */}
-                    <div className="sm:col-span-2">
-                      <label className={labelCls}>Property Owner <span className="normal-case text-gray-400 font-normal">(optional — leave blank for platform-owned)</span></label>
-                      <select
-                        value={propForm.owner_id}
-                        onChange={e => setPropForm(f => ({ ...f, owner_id: e.target.value }))}
-                        className={inputCls}
-                      >
-                        <option value="">— Platform Owned (no commission split) —</option>
-                        {owners.map(o => (
-                          <option key={o.id} value={o.id}>{o.name} ({o.email}) · {o.commission_percent}% commission</option>
-                        ))}
-                      </select>
-                    </div>
-                    {/* Flash Deal */}
-                    <div className="sm:col-span-2">
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <label className="flex items-center gap-2 text-xs font-bold text-amber-700 uppercase tracking-wide cursor-pointer">
-                            <Zap size={14} className="text-amber-500" /> Flash Deal
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setPropForm(f => ({ ...f, is_featured: !f.is_featured }))}
-                            className="text-amber-600"
-                          >
-                            {propForm.is_featured
-                              ? <ToggleRight size={28} className="text-amber-500" />
-                              : <ToggleLeft size={28} className="text-gray-400" />}
-                          </button>
-                        </div>
-                        {propForm.is_featured && (
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className={labelCls}>Discount (%)</label>
-                              <input
-                                type="number"
-                                placeholder="e.g. 20"
-                                min="1" max="99"
-                                value={propForm.discount_percent}
-                                onChange={e => setPropForm(f => ({ ...f, discount_percent: e.target.valueAsNumber || 0 }))}
-                                className={inputCls}
-                              />
-                            </div>
-                            <div>
-                              <label className={labelCls}>Deal Label</label>
-                              <input
-                                type="text"
-                                placeholder="e.g. Weekend Special"
-                                value={propForm.deal_label}
-                                onChange={e => setPropForm(f => ({ ...f, deal_label: e.target.value }))}
-                                className={inputCls}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  {propError && <p className="text-red-500 text-sm">{propError}</p>}
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="submit"
-                      disabled={propSaving}
-                      className="flex items-center gap-2 bg-golden hover:bg-golden-dark text-white font-bold px-6 py-2.5 rounded-xl transition text-sm disabled:opacity-60"
-                    >
-                      {propSaving && (
-                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                        </svg>
-                      )}
-                      {propSaving ? 'Saving…' : editingProp ? 'Save Changes' : 'Add Property'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowPropForm(false); setEditingProp(null); setPropForm(EMPTY_PROP_FORM); }}
-                      className="text-sm font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 px-6 py-2.5 rounded-xl transition"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
+                {renderPropFormContent()}
               </div>
             )}
 
@@ -1385,6 +1399,12 @@ const OwnerDashboard = () => {
                           </button>
                         </div>
                         {blockError && <p className="text-red-500 text-xs mt-2">{blockError}</p>}
+                      </div>
+                    )}
+                    {/* Inline edit form — opens directly below this property row */}
+                    {editingProp?.id === p.id && (
+                      <div ref={editFormRef} className="border-t-2 border-golden/30 bg-golden/[0.03] px-5 sm:px-6 py-5">
+                        {renderPropFormContent()}
                       </div>
                     )}
                     </React.Fragment>
