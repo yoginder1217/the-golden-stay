@@ -1,92 +1,8 @@
 # The Golden Stay
 
-> **Premium short-stay homestay platform for families — evolving into a full-stack SaaS for property owners and franchise partners.**
+A full-stack short-stay rental marketplace built with React 19 and Supabase. Guests discover and book premium family properties; property owners track earnings through a dedicated portal; the platform admin manages everything through a feature-rich dashboard — with no traditional backend server required.
 
----
-
-## What Is This?
-
-The Golden Stay is a hospitality brand offering curated 2BHK and 3BHK family suites in Noida, Indirapuram, and Greater Noida. This repository is the public-facing web platform that handles property discovery, direct bookings, franchise inquiries, and (in progress) a complete revenue management dashboard for property owners.
-
-The end goal is a **two-sided SaaS marketplace**:
-- **Guests** discover, compare, and book premium stays.
-- **Property Owners / Franchise Partners** list their properties, track bookings, manage pricing, and get real-time revenue analytics — all from a single dashboard.
-
----
-
-## Current State (Phase 1 — Frontend MVP)
-
-The frontend shell is live and deployed on Vercel. Core pages and UI components are built; backend wiring is still in progress.
-
-### What Works
-- Property listings with filtering (2BHK / 3BHK / Villa)
-- Property detail pages with multi-platform booking links (Airbnb, MakeMyTrip, Goibibo)
-- Direct booking flow (UI only — Checkout → Booking Success)
-- Contact form (EmailJS integration — needs credentials)
-- Auth context (simulated — no real backend yet)
-- Franchise CTA and FAQ sections
-- Fully responsive design (mobile-first)
-- Framer Motion animations throughout
-- SEO meta tags via React Helmet Async
-- WhatsApp floating CTA
-
-### What Is Placeholder / Broken
-- Hero search bar does not filter properties
-- Checkout is disconnected from the selected property (always shows hardcoded data)
-- Auth stores a hardcoded user name — no real login/signup
-- EmailJS credentials are placeholder values
-- "View Photos", "Filters", and "Map View" buttons are dead UI
-- No form validation on Checkout or Contact
-- No payment gateway integration
-
----
-
-## Roadmap to Full-Stack SaaS
-
-### Phase 2 — Working Booking Flow
-- [ ] Connect hero search to the Properties page with query params
-- [ ] Pass selected property + dates + guests through the booking flow
-- [ ] Validate and submit real checkout form data
-- [ ] Integrate Razorpay / Stripe for payments
-- [ ] Send booking confirmation emails (EmailJS or Resend)
-- [ ] Booking confirmation page with real reservation details
-
-### Phase 3 — Real Authentication
-- [ ] Replace simulated auth with Supabase Auth (email/password + Google OAuth)
-- [ ] Persist session across page refreshes
-- [ ] Role-based access: Guest / Property Owner / Admin
-- [ ] Protected routes for Dashboard and Owner Panel
-- [ ] Password reset and email verification flows
-
-### Phase 4 — Database & Backend
-- [ ] Supabase PostgreSQL schema: users, properties, bookings, reviews
-- [ ] Real property CRUD — owners can add/edit/remove listings
-- [ ] Availability calendar — blocked dates, check-in/out constraints
-- [ ] Dynamic pricing engine — weekday vs. weekend vs. seasonal rates
-- [ ] Booking status lifecycle: Pending → Confirmed → Checked In → Completed
-
-### Phase 5 — Owner / Franchise SaaS Dashboard
-- [ ] Revenue analytics: monthly earnings, occupancy rate, average nightly rate
-- [ ] Booking management table with status filters
-- [ ] Calendar view of upcoming reservations
-- [ ] Guest messaging system (in-app + WhatsApp notification)
-- [ ] Performance benchmarks vs. comparable properties
-- [ ] Payout tracking and invoice generation
-
-### Phase 6 — Guest Experience
-- [ ] Guest profile with booking history
-- [ ] Review and rating system (post-checkout)
-- [ ] Wishlist / saved properties
-- [ ] Loyalty points or repeat-guest discounts
-- [ ] Real-time availability widget (no double-bookings)
-
-### Phase 7 — Growth & Marketplace
-- [ ] Multi-city expansion (property data is not hardcoded)
-- [ ] Property owner self-onboarding flow
-- [ ] Franchise application and approval workflow
-- [ ] Channel manager integration (sync availability with Airbnb / MakeMyTrip APIs)
-- [ ] Admin panel: approve listings, manage disputes, view platform-wide analytics
-- [ ] Blog / SEO content pages for organic traffic
+**Live:** [Deployed on Vercel](https://the-golden-stay.vercel.app)
 
 ---
 
@@ -94,62 +10,280 @@ The frontend shell is live and deployed on Vercel. Core pages and UI components 
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 19, Vite 7, Tailwind CSS 4 |
-| Routing | React Router v7 |
-| Animations | Framer Motion |
+| Frontend | React 19, Vite 7, React Router v7 |
+| Styling | Tailwind CSS 4, Framer Motion |
 | Icons | Lucide React |
-| SEO | React Helmet Async |
-| Auth (planned) | Supabase Auth |
-| Database (planned) | Supabase PostgreSQL |
-| Payments (planned) | Razorpay |
-| Email (planned) | EmailJS / Resend |
+| Database / Auth | Supabase (PostgreSQL + RLS + Auth + Storage + Realtime) |
+| Edge Functions | Supabase Edge Functions (Deno / TypeScript) |
+| Payments | Razorpay Standard Checkout |
+| Maps | React Leaflet |
+| PDF | jsPDF + react-to-print |
+| SEO | react-helmet-async |
 | Deployment | Vercel |
+
+---
+
+## Features
+
+### Guest Experience
+- **Property discovery** — filterable listing grid with image lightbox, per-amenity icons, and sticky scroll header
+- **Dynamic pricing** — weekend premium, minimum night enforcement, cleaning & service fees
+- **Razorpay booking** — integrated payment with booking confirmation email sent via Edge Function
+- **Promo codes** — percent or flat discounts with expiry and usage limits
+- **Loyalty rewards** — earn points on every stay, redeem on checkout
+- **Referral system** — unique referral links with tracked credit rewards
+- **Guest dashboard** — upcoming & past bookings, PDF download, modify / cancel flows
+- **Wishlist** — save and revisit favourite properties
+- **Q&A** — ask questions on any property page, answered publicly by admin
+- **Push notifications** — web push for booking confirmations and platform announcements
+- **Dark mode** — system-aware with manual toggle, persisted to `localStorage`
+- **Mobile-first** — sticky mobile booking bar + animated bottom sheet on property pages
+
+### Property Owner Portal (`/owner-portal`)
+- Overview stats: properties listed, total bookings, net earnings, pending payout
+- Earnings breakdown: gross revenue → platform commission → net (with 6-month bar chart)
+- Per-property revenue analysis
+- Full bookings table with guest details and stay dates
+- Payout history — payment method, transaction reference, status
+
+### Admin Dashboard (`/owner`)
+
+| Tab | Capability |
+|---|---|
+| All Bookings | Search / filter by status & property, update booking status, CSV export |
+| Properties | Add / edit / delete properties, image upload, block dates, flash deals |
+| Property Owners | Add owners with commission %, bank / UPI details, link to site login |
+| Payouts | Auto-compute monthly settlements from completed stays, mark as paid |
+| Guest History | Booking history grouped by property |
+| Q&A | Answer guest questions (unanswered flagged first) |
+| Messages | View and reply to contact form submissions |
+| Channel Manager | Toggle Airbnb / MakeMyTrip / Goibibo listing links per property |
+| Promo Codes | Create and manage discount codes |
+| Site Content | Edit all page copy live without redeploying |
+
+### Multi-Owner Marketplace
+- Per-owner commission rate (default 10% platform / 90% owner)
+- Monthly settlement cycle — only completed stays are eligible
+- Admin creates payout records; owners see them in their read-only portal
+- Mark-as-paid flow captures payment method (UPI / bank transfer / cash) and transaction reference
 
 ---
 
 ## Project Structure
 
 ```
-src/
-├── components/       # Reusable UI: Navbar, Footer, PropertyCard, FAQ, etc.
-├── context/          # Auth context (AuthProvider + AuthContextUtils)
-├── data/             # Static property data (will move to DB in Phase 4)
-├── pages/            # Route-level components: Home, Properties, Checkout, etc.
-├── App.jsx           # Route definitions and layout wrapper
-└── main.jsx          # React DOM entry point
+the-golden-stay/
+├── public/                         # Static assets (logo, favicon, OG image)
+├── src/
+│   ├── components/                 # Navbar, Footer, PropertyCard, WishlistButton, …
+│   ├── context/                    # AuthProvider, SiteContentContext
+│   ├── lib/                        # Supabase data layer
+│   │   ├── supabase.js
+│   │   ├── properties.js
+│   │   ├── bookings.js
+│   │   ├── adminBookings.js
+│   │   ├── owners.js               # Multi-owner marketplace & payout functions
+│   │   ├── availability.js         # Blocked dates
+│   │   ├── pricing.js              # Dynamic pricing logic
+│   │   ├── promoCodes.js
+│   │   ├── notifications.js
+│   │   ├── referrals.js
+│   │   ├── siteContent.js
+│   │   └── …
+│   ├── pages/
+│   │   ├── Home.jsx
+│   │   ├── Properties.jsx
+│   │   ├── PropertyDetails.jsx     # Lightbox, sticky header, mobile booking bar
+│   │   ├── Checkout.jsx            # Razorpay integration
+│   │   ├── BookingSuccess.jsx
+│   │   ├── Dashboard.jsx           # Guest bookings
+│   │   ├── OwnerDashboard.jsx      # Admin-only platform management
+│   │   ├── OwnerPortal.jsx         # Property owner read-only view
+│   │   ├── Wishlist.jsx
+│   │   ├── Profile.jsx
+│   │   ├── Rewards.jsx
+│   │   └── …
+│   └── App.jsx
+├── supabase/
+│   ├── functions/
+│   │   ├── send-booking-email/     # Confirmation email via Resend
+│   │   ├── notify-booking/         # In-app notification trigger
+│   │   └── send-push/              # Web Push dispatch
+│   ├── properties_setup.sql
+│   ├── bookings_rls_setup.sql
+│   ├── owners_setup.sql            # property_owners & payouts tables
+│   ├── promo_codes_setup.sql
+│   ├── notifications_setup.sql
+│   ├── blocked_dates_setup.sql
+│   ├── flash_deals_setup.sql
+│   ├── property_qa_setup.sql
+│   ├── site_content_setup.sql
+│   ├── storage_setup.sql
+│   ├── push_subscriptions_setup.sql
+│   └── …
+├── index.html                      # Razorpay checkout.js loaded here
+├── .env                            # Local environment variables — never committed
+└── vite.config.js
 ```
 
 ---
 
-## Local Development
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- A [Supabase](https://supabase.com) project
+- A [Razorpay](https://razorpay.com) account (test mode keys are sufficient for development)
+
+### Install
 
 ```bash
+git clone https://github.com/yoginder1217/the-golden-stay.git
+cd the-golden-stay
 npm install
+```
+
+### Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_RAZORPAY_KEY_ID=rzp_test_your_key_id
+VITE_ADMIN_EMAIL=your-admin@email.com
+VITE_VAPID_PUBLIC_KEY=your_vapid_public_key
+```
+
+> The Supabase URL, anon key, and Razorpay Key ID are safe to expose in the frontend.
+> Keep the Razorpay Key Secret and Supabase Service Role Key server-side only — never commit them.
+
+### Run Locally
+
+```bash
 npm run dev
 ```
 
-Runs on `http://localhost:5173`.
+Visit `http://localhost:5173`
 
 ---
 
-## Environment Variables
+## Database Setup
 
-Create a `.env` file in the root (never commit it):
+Run each SQL file in the **Supabase SQL Editor** in this order:
 
-```env
-VITE_EMAILJS_SERVICE_ID=your_service_id
-VITE_EMAILJS_TEMPLATE_ID=your_template_id
-VITE_EMAILJS_PUBLIC_KEY=your_public_key
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_RAZORPAY_KEY_ID=your_razorpay_key
 ```
+supabase/properties_setup.sql
+supabase/bookings_rls_setup.sql
+supabase/notifications_setup.sql
+supabase/blocked_dates_setup.sql
+supabase/flash_deals_setup.sql
+supabase/promo_codes_setup.sql
+supabase/property_qa_setup.sql
+supabase/contact_messages_setup.sql
+supabase/newsletter_referral_setup.sql
+supabase/site_content_setup.sql
+supabase/storage_setup.sql
+supabase/push_subscriptions_setup.sql
+supabase/add_weekend_premium.sql
+supabase/add_property_images.sql
+supabase/add_review_count.sql
+supabase/owners_setup.sql
+```
+
+After running `owners_setup.sql`, update the two admin RLS policies with your actual admin email:
+
+```sql
+DROP POLICY IF EXISTS "Admin full access property_owners" ON property_owners;
+DROP POLICY IF EXISTS "Admin full access payouts" ON payouts;
+
+CREATE POLICY "Admin full access property_owners" ON property_owners
+  FOR ALL USING ((auth.jwt() ->> 'email') = 'your-admin@email.com');
+
+CREATE POLICY "Admin full access payouts" ON payouts
+  FOR ALL USING ((auth.jwt() ->> 'email') = 'your-admin@email.com');
+```
+
+---
+
+## Edge Functions
+
+| Function | Trigger | Purpose |
+|---|---|---|
+| `send-booking-email` | Called from Checkout on payment success | Sends booking confirmation email via Resend |
+| `notify-booking` | PostgreSQL trigger on bookings INSERT | Creates in-app notification for the guest |
+| `send-push` | Called when a push notification is needed | Dispatches Web Push to subscribed devices |
+
+**Secrets required** (set in Supabase Dashboard → Edge Functions → Secrets):
+
+```
+RESEND_API_KEY=re_your_resend_api_key
+VAPID_PRIVATE_KEY=your_vapid_private_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
+
+Deploy with the Supabase CLI:
+
+```bash
+supabase functions deploy send-booking-email
+supabase functions deploy notify-booking
+supabase functions deploy send-push
+```
+
+---
+
+## Deployment
+
+Deploys automatically to Vercel from the `main` branch.
+
+1. Connect the GitHub repository in Vercel
+2. Add all `.env` variables under **Vercel → Settings → Environment Variables**
+3. Every push to `main` triggers a production build
+
+---
+
+## Key Routes
+
+| Route | Access | Description |
+|---|---|---|
+| `/` | Public | Home — hero, featured properties, testimonials, FAQ |
+| `/properties` | Public | All properties with search & filter |
+| `/property/:id` | Public | Property detail, gallery, booking widget |
+| `/checkout` | Public | Guest details + Razorpay payment |
+| `/booking-success` | Public | Confirmation screen |
+| `/login` · `/signup` | Public | Authentication |
+| `/dashboard` | Logged in | Guest bookings & history |
+| `/wishlist` | Logged in | Saved properties |
+| `/profile` | Logged in | Edit profile & change password |
+| `/rewards` | Logged in | Loyalty points & referral links |
+| `/owner-portal` | Property owner | Earnings, bookings & payout history |
+| `/owner` | Admin only | Full platform management dashboard |
+
+---
+
+## Onboarding a Property Owner
+
+1. The owner creates a regular account at `/signup`
+2. In Supabase Dashboard → **Authentication → Users**, copy their UUID
+3. In the Admin Dashboard → **Property Owners** tab → Add Owner → paste the UUID into the **User ID** field
+4. Edit any property → assign it to that owner from the dropdown
+5. The owner now sees **My Portal** in the navbar after login
 
 ---
 
 ## Brand
 
-- **Primary:** Golden `#D4AF37`
-- **Dark accent:** `#AA8C2C`
-- **Background dark:** Charcoal `#1A1A1A`
-- **Typefaces:** Playfair Display (headings) · Lato (body)
+| Token | Value |
+|---|---|
+| Primary (Golden) | `#D4AF37` |
+| Dark accent | `#AA8C2C` |
+| Charcoal | `#1A1A1A` |
+| Display typeface | Playfair Display |
+| Body typeface | Lato / system-ui |
+
+---
+
+## License
+
+Private project. All rights reserved © The Golden Stay.
