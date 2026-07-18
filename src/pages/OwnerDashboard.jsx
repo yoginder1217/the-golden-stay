@@ -1071,8 +1071,8 @@ const OwnerDashboard = () => {
                       type="number"
                       placeholder="e.g. 20"
                       min="1" max="99"
-                      value={propForm.discount_percent}
-                      onChange={e => setPropForm(f => ({ ...f, discount_percent: e.target.valueAsNumber || 0 }))}
+                      value={propForm.discount_percent || ''}
+                      onChange={e => setPropForm(f => ({ ...f, discount_percent: parseInt(e.target.value, 10) || 0 }))}
                       className={inputCls}
                     />
                   </div>
