@@ -858,8 +858,8 @@ const OwnerDashboard = () => {
               placeholder="e.g. 20"
               min="0"
               max="100"
-              value={propForm.weekend_premium}
-              onChange={e => setPropForm(f => ({ ...f, weekend_premium: e.target.valueAsNumber || 0 }))}
+              value={propForm.weekend_premium || ''}
+              onChange={e => setPropForm(f => ({ ...f, weekend_premium: parseInt(e.target.value, 10) || 0 }))}
               className={inputCls}
             />
             <p className="text-xs text-gray-400 mt-1">0 = flat rate. e.g. 20 = 20% more on Fri &amp; Sat nights.</p>
