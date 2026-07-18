@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { MapPin, Calendar, Users, ShieldCheck, AlertCircle, LogIn, Award, Tag, CheckCircle } from 'lucide-react';
+import { MapPin, Calendar, Users, ShieldCheck, AlertCircle, LogIn, Award, Tag, CheckCircle, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContextUtils';
 import { saveBooking, getUserBookings } from '../lib/bookings';
 import { supabase } from '../lib/supabase';
 import { validatePromoCode } from '../lib/promoCodes';
+import { getActiveAddons } from '../lib/addons';
 import { createNotification } from '../lib/notifications';
 
 const formatDate = (dateStr) =>
@@ -87,7 +88,20 @@ const Checkout = () => {
   };
 
   const promoDiscount = promoApplied?.discount || 0;
-  const finalTotal = (total || 0) - promoDiscount - pointsDiscount;
+
+  // Add-on packages
+  const [availableAddons, setAvailableAddons] = useState([]);
+  const [selectedAddons, setSelectedAddons] = useState({});
+
+  useEffect(() => {
+    getActiveAddons().then(setAvailableAddons).catch(() => {});
+  }, []);
+
+  const toggleAddon = (id) => setSelectedAddons(prev => ({ ...prev, [id]: !prev[id] }));
+  const selectedAddonsList = availableAddons.filter(a => selectedAddons[a.id]);
+  const addonsTotal = selectedAddonsList.reduce((s, a) => s + Number(a.price), 0);
+
+  const finalTotal = (total || 0) - promoDiscount - pointsDiscount + addonsTotal;
 
   if (!state?.property) return null;
 
@@ -156,6 +170,8 @@ const Checkout = () => {
           promo_discount: promoDiscount,
           loyalty_discount: pointsDiscount,
           points_redeemed: pointsRedeemed,
+          addons_data: JSON.stringify(selectedAddonsList.map(a => ({ id: a.id, title: a.title, price: a.price }))),
+          addons_total: addonsTotal,
           total: finalTotal,
           guest_name: form.name,
           guest_email: form.email,
@@ -194,6 +210,11 @@ const Checkout = () => {
         navigate('/booking-success', {
           state: {
             property, checkin, checkout, guests, nights,
+            subtotal, cleaningFee, serviceFee,
+            promoDiscount, promoCode: promoApplied?.code || null,
+            loyaltyDiscount: pointsDiscount,
+            addonsTotal,
+            addonsData: JSON.stringify(selectedAddonsList.map(a => ({ id: a.id, title: a.title, price: a.price }))),
             total: finalTotal,
             guestName: form.name,
             guestEmail: form.email,
@@ -221,6 +242,7 @@ const Checkout = () => {
         notes: { booking_ref: bookingRef, property: property.title },
         theme: { color: '#D4AF37' },
         modal: { ondismiss: () => setLoading(false) },
+        method: { card: true, netbanking: true, upi: true, wallet: true, emi: true },
       };
       const rzp = new window.Razorpay(options);
       rzp.open();
@@ -424,6 +446,56 @@ const Checkout = () => {
                 )}
               </div>
             )}
+            {/* Enhance Your Stay — Add-ons */}
+            {availableAddons.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-golden/10 flex items-center justify-center">
+                    <Sparkles size={18} className="text-golden" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-charcoal text-sm">Enhance Your Stay</p>
+                    <p className="text-gray-500 text-xs">Optional add-ons — select and pay together</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {availableAddons.map(addon => {
+                    const selected = !!selectedAddons[addon.id];
+                    return (
+                      <button
+                        key={addon.id}
+                        type="button"
+                        onClick={() => toggleAddon(addon.id)}
+                        className={`text-left p-3.5 rounded-xl border-2 transition-all ${
+                          selected
+                            ? 'border-golden bg-golden/5'
+                            : 'border-gray-100 hover:border-golden/40 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="text-base mr-1.5">{addon.emoji}</span>
+                            <span className="font-bold text-charcoal text-sm">{addon.title}</span>
+                            <p className="text-gray-500 text-xs mt-0.5 leading-snug">{addon.description}</p>
+                          </div>
+                          <div className="flex flex-col items-end shrink-0">
+                            <span className="font-bold text-golden text-sm">+₹{Number(addon.price).toLocaleString('en-IN')}</span>
+                            <div className={`mt-1.5 w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${selected ? 'bg-golden border-golden' : 'border-gray-300'}`}>
+                              {selected && <CheckCircle size={10} className="text-white" />}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {addonsTotal > 0 && (
+                  <p className="text-golden text-xs font-bold mt-3 flex items-center gap-1">
+                    <Sparkles size={11} /> ₹{addonsTotal.toLocaleString('en-IN')} in add-ons added to your booking
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right: Order Summary */}
@@ -477,6 +549,12 @@ const Checkout = () => {
                 <div className="flex justify-between text-gray-600">
                   <span>Service fee</span><span>₹{serviceFee}</span>
                 </div>
+                {addonsTotal > 0 && (
+                  <div className="flex justify-between text-charcoal font-medium">
+                    <span>Add-ons ({selectedAddonsList.length})</span>
+                    <span>₹{addonsTotal.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
                 {promoDiscount > 0 && (
                   <div className="flex justify-between text-green-600 font-medium">
                     <span>Promo ({promoApplied?.code})</span>

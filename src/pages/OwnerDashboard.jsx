@@ -17,12 +17,14 @@ import {
   ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X,
   Download, Reply, CalendarX, Upload, ImageIcon,
   HelpCircle, Tag, Zap, CheckCircle, FileText, Save, PlusCircle,
-  UserCheck, Banknote, Send, Clock,
+  UserCheck, Banknote, Send, Clock, Star, MessageSquare, Package,
 } from 'lucide-react';
 import {
   getOwners, saveOwner, deleteOwner, getPayouts, savePayout, markPayoutPaid,
   getOwnerProperties, getOwnerBookings,
 } from '../lib/owners';
+import { getAllReviews, deleteReview } from '../lib/reviews';
+import { getAllAddons, saveAddon, deleteAddon, toggleAddonActive } from '../lib/addons';
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
 const PAGE_SIZE = 10;
@@ -131,6 +133,22 @@ const OwnerDashboard = () => {
   const [markingPaidId, setMarkingPaidId] = useState(null);
   const [markPaidForm, setMarkPaidForm] = useState({ payment_method: 'upi', transaction_ref: '', notes: '' });
 
+  // Reviews moderation tab
+  const [allReviews, setAllReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [deletingReviewId, setDeletingReviewId] = useState(null);
+
+  // Addons management tab
+  const EMPTY_ADDON_FORM = { title: '', description: '', price: '', category: 'experience', emoji: '✨', sort_order: '0' };
+  const [addonsData, setAddonsData] = useState([]);
+  const [addonsLoading, setAddonsLoading] = useState(false);
+  const [showAddonForm, setShowAddonForm] = useState(false);
+  const [editingAddon, setEditingAddon] = useState(null);
+  const [addonForm, setAddonForm] = useState(EMPTY_ADDON_FORM);
+  const [addonSaving, setAddonSaving] = useState(false);
+  const [addonFormError, setAddonFormError] = useState('');
+  const [deletingAddonId, setDeletingAddonId] = useState(null);
+
   // Content CMS tab
   const { c, cJSON, setContent: setLiveContent, contentMap } = useSiteContent();
   const [draft, setDraft] = useState({});
@@ -198,6 +216,16 @@ const OwnerDashboard = () => {
   const fetchPayoutsAdmin = useCallback(async () => {
     setPayoutsLoading(true);
     try { setAllPayouts(await getPayouts()); } catch {} finally { setPayoutsLoading(false); }
+  }, []);
+
+  const fetchReviewsAdmin = useCallback(async () => {
+    setReviewsLoading(true);
+    try { setAllReviews(await getAllReviews()); } catch {} finally { setReviewsLoading(false); }
+  }, []);
+
+  const fetchAddonsAdmin = useCallback(async () => {
+    setAddonsLoading(true);
+    try { setAddonsData(await getAllAddons()); } catch {} finally { setAddonsLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -332,6 +360,70 @@ const OwnerDashboard = () => {
       setAllPayouts(prev => prev.map(p => p.id === payoutId ? { ...p, ...updated } : p));
       setMarkingPaidId(null); setMarkPaidForm({ payment_method: 'upi', transaction_ref: '', notes: '' });
     } catch { setMarkingPaidId(null); }
+  };
+
+  // ── Review moderation handlers ──
+  const handleDeleteReview = async (id) => {
+    if (!window.confirm('Delete this review? This cannot be undone.')) return;
+    setDeletingReviewId(id);
+    try {
+      await deleteReview(id);
+      setAllReviews(prev => prev.filter(r => r.id !== id));
+    } catch {}
+    finally { setDeletingReviewId(null); }
+  };
+
+  // ── Addon handlers ──
+  const handleAddonFormSubmit = async (e) => {
+    e.preventDefault();
+    if (!addonForm.title.trim() || !addonForm.price) {
+      setAddonFormError('Title and price are required.'); return;
+    }
+    setAddonFormError(''); setAddonSaving(true);
+    try {
+      const payload = {
+        ...(editingAddon?.id ? { id: editingAddon.id } : {}),
+        title: addonForm.title.trim(),
+        description: addonForm.description.trim(),
+        price: parseFloat(addonForm.price) || 0,
+        category: addonForm.category,
+        emoji: addonForm.emoji.trim() || '✨',
+        sort_order: parseInt(addonForm.sort_order, 10) || 0,
+        is_active: editingAddon ? editingAddon.is_active : true,
+      };
+      const saved = await saveAddon(payload);
+      setAddonsData(prev => {
+        const idx = prev.findIndex(a => a.id === saved.id);
+        return idx >= 0 ? prev.map(a => a.id === saved.id ? saved : a) : [...prev, saved];
+      });
+      setShowAddonForm(false); setEditingAddon(null); setAddonForm(EMPTY_ADDON_FORM);
+    } catch (err) {
+      setAddonFormError(err?.message || 'Failed to save add-on.');
+    } finally { setAddonSaving(false); }
+  };
+
+  const handleEditAddon = (a) => {
+    setEditingAddon(a);
+    setAddonForm({
+      title: a.title, description: a.description || '',
+      price: String(a.price), category: a.category || 'experience',
+      emoji: a.emoji || '✨', sort_order: String(a.sort_order || 0),
+    });
+    setAddonFormError(''); setShowAddonForm(true);
+  };
+
+  const handleDeleteAddon = async (id) => {
+    if (!window.confirm('Delete this add-on?')) return;
+    setDeletingAddonId(id);
+    try { await deleteAddon(id); setAddonsData(prev => prev.filter(a => a.id !== id)); } catch {}
+    finally { setDeletingAddonId(null); }
+  };
+
+  const handleToggleAddonActive = async (addon) => {
+    try {
+      await toggleAddonActive(addon.id, !addon.is_active);
+      setAddonsData(prev => prev.map(a => a.id === addon.id ? { ...a, is_active: !a.is_active } : a));
+    } catch {}
   };
 
   const handleStatusChange = async (bookingId, newStatus) => {
@@ -542,6 +634,14 @@ const OwnerDashboard = () => {
     }
   }, [isAdmin, activeTab, fetchPayoutsAdmin, fetchOwners, owners.length]);
 
+  useEffect(() => {
+    if (isAdmin && activeTab === 'reviews') fetchReviewsAdmin();
+  }, [isAdmin, activeTab, fetchReviewsAdmin]);
+
+  useEffect(() => {
+    if (isAdmin && activeTab === 'addons') fetchAddonsAdmin();
+  }, [isAdmin, activeTab, fetchAddonsAdmin]);
+
   const handleAddPromo = async (e) => {
     e.preventDefault();
     if (!promoForm.code.trim()) { setPromoFormError('Code is required.'); return; }
@@ -675,6 +775,8 @@ const OwnerDashboard = () => {
     { id: 'guests', label: 'Guest History', icon: Calendar },
     { id: 'owners', label: 'Property Owners', icon: UserCheck },
     { id: 'payouts', label: 'Payouts', icon: Banknote },
+    { id: 'reviews', label: `Reviews${allReviews.length ? ` (${allReviews.length})` : ''}`, icon: Star },
+    { id: 'addons', label: 'Add-ons', icon: Package },
     { id: 'qa', label: 'Q&A', icon: HelpCircle },
     { id: 'messages', label: `Messages${messages.length ? ` (${messages.length})` : ''}`, icon: Mail },
     { id: 'channels', label: 'Channel Manager', icon: Globe },
@@ -2347,6 +2449,210 @@ const OwnerDashboard = () => {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {/* Reviews Moderation Tab */}
+        {activeTab === 'reviews' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-bold text-charcoal flex items-center gap-2 text-base">
+                <Star size={16} className="text-golden fill-golden" /> Guest Reviews
+              </h2>
+              <button onClick={fetchReviewsAdmin} className="flex items-center gap-1.5 text-xs font-bold text-golden border border-golden/30 hover:bg-golden/5 px-3 py-1.5 rounded-full transition">
+                <RefreshCw size={12} /> Refresh
+              </button>
+            </div>
+            {reviewsLoading ? (
+              <div className="p-14 flex items-center justify-center">
+                <svg className="animate-spin h-7 w-7 text-golden" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+              </div>
+            ) : allReviews.length === 0 ? (
+              <div className="p-14 text-center text-gray-400 text-sm">No reviews yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left">
+                      {['Property', 'Reviewer', 'Rating', 'Comment', 'Date', ''].map(h => (
+                        <th key={h} className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {allReviews.map(r => (
+                      <tr key={r.id} className="hover:bg-gray-50/50 transition">
+                        <td className="px-4 py-3 text-gray-700 whitespace-nowrap max-w-[160px] truncate font-medium">{r.property_title || `Property #${r.property_id}`}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <p className="font-semibold text-charcoal">{r.reviewer_name}</p>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-1">
+                            {[1,2,3,4,5].map(s => (
+                              <Star key={s} size={12} className={s <= r.rating ? 'text-golden fill-golden' : 'text-gray-200 fill-gray-200'} />
+                            ))}
+                            <span className="text-xs text-gray-500 ml-1">{r.rating}/5</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 max-w-[260px]">
+                          <p className="truncate text-xs">{r.comment}</p>
+                        </td>
+                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">{fmtDate(r.created_at)}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <button
+                            onClick={() => handleDeleteReview(r.id)}
+                            disabled={deletingReviewId === r.id}
+                            className="flex items-center gap-1 text-xs font-bold text-red-500 hover:text-red-700 disabled:opacity-50 transition"
+                          >
+                            <Trash2 size={12} /> {deletingReviewId === r.id ? 'Deleting…' : 'Delete'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Add-ons Management Tab */}
+        {activeTab === 'addons' && (
+          <div className="space-y-4">
+            {showAddonForm && (
+              <div className="bg-white rounded-2xl border border-golden/30 shadow-md p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="font-bold text-charcoal text-base">
+                    {editingAddon ? 'Edit Add-on' : 'New Add-on'}
+                  </h2>
+                  <button
+                    onClick={() => { setShowAddonForm(false); setEditingAddon(null); setAddonForm(EMPTY_ADDON_FORM); }}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition"
+                  >
+                    <X size={18} className="text-gray-400" />
+                  </button>
+                </div>
+                <form onSubmit={handleAddonFormSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>Title *</label>
+                      <input value={addonForm.title} onChange={e => setAddonForm(f => ({ ...f, title: e.target.value }))} className={inputCls} placeholder="e.g. Candlelight Dinner" required />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>Description</label>
+                      <textarea rows={2} value={addonForm.description} onChange={e => setAddonForm(f => ({ ...f, description: e.target.value }))} className={inputCls + ' resize-none'} placeholder="Brief description shown at checkout" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Price (₹) *</label>
+                      <input type="number" min="0" step="50" value={addonForm.price} onChange={e => setAddonForm(f => ({ ...f, price: e.target.value }))} className={inputCls} required />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Emoji</label>
+                      <input value={addonForm.emoji} onChange={e => setAddonForm(f => ({ ...f, emoji: e.target.value }))} className={inputCls} placeholder="✨" maxLength={4} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Category</label>
+                      <select value={addonForm.category} onChange={e => setAddonForm(f => ({ ...f, category: e.target.value }))} className={inputCls}>
+                        <option value="experience">Experience</option>
+                        <option value="food">Food & Drink</option>
+                        <option value="transport">Transport</option>
+                        <option value="wellness">Wellness</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Sort Order</label>
+                      <input type="number" min="0" value={addonForm.sort_order} onChange={e => setAddonForm(f => ({ ...f, sort_order: e.target.value }))} className={inputCls} />
+                    </div>
+                  </div>
+                  {addonFormError && <p className="text-red-500 text-xs">{addonFormError}</p>}
+                  <div className="flex gap-3 pt-2">
+                    <button type="submit" disabled={addonSaving} className="bg-golden hover:bg-golden-dark disabled:opacity-60 text-white font-bold px-6 py-2.5 rounded-xl transition text-sm flex items-center gap-2">
+                      <Save size={14} /> {addonSaving ? 'Saving…' : editingAddon ? 'Update Add-on' : 'Create Add-on'}
+                    </button>
+                    <button type="button" onClick={() => { setShowAddonForm(false); setEditingAddon(null); setAddonForm(EMPTY_ADDON_FORM); }} className="border border-gray-200 hover:bg-gray-50 text-gray-600 font-bold px-5 py-2.5 rounded-xl transition text-sm">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="font-bold text-charcoal flex items-center gap-2 text-base">
+                  <Package size={16} className="text-golden" /> Add-on Packages
+                </h2>
+                <button
+                  onClick={() => { setShowAddonForm(true); setEditingAddon(null); setAddonForm(EMPTY_ADDON_FORM); setAddonFormError(''); }}
+                  className="flex items-center gap-1.5 bg-golden hover:bg-golden-dark text-white font-bold px-4 py-2 rounded-full transition text-sm"
+                >
+                  <Plus size={14} /> New Add-on
+                </button>
+              </div>
+              {addonsLoading ? (
+                <div className="p-14 flex items-center justify-center">
+                  <svg className="animate-spin h-7 w-7 text-golden" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                </div>
+              ) : addonsData.length === 0 ? (
+                <div className="p-14 text-center text-gray-400 text-sm">
+                  No add-ons yet. Run <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">supabase/addons_setup.sql</code> first.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left">
+                        {['', 'Title', 'Category', 'Price', 'Order', 'Active', ''].map(h => (
+                          <th key={h} className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {addonsData.map(a => (
+                        <tr key={a.id} className={`hover:bg-gray-50/50 transition ${!a.is_active ? 'opacity-50' : ''}`}>
+                          <td className="px-4 py-3 text-xl">{a.emoji}</td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-charcoal">{a.title}</p>
+                            <p className="text-gray-400 text-xs truncate max-w-[200px]">{a.description}</p>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 capitalize whitespace-nowrap">{a.category}</td>
+                          <td className="px-4 py-3 font-bold text-charcoal whitespace-nowrap">₹{Number(a.price).toLocaleString('en-IN')}</td>
+                          <td className="px-4 py-3 text-gray-400 text-center">{a.sort_order}</td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => handleToggleAddonActive(a)}
+                              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${a.is_active ? 'bg-golden' : 'bg-gray-200'}`}
+                            >
+                              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${a.is_active ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <button onClick={() => handleEditAddon(a)} className="text-xs font-bold text-blue-500 hover:text-blue-700 flex items-center gap-1 transition">
+                                <Pencil size={12} /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteAddon(a.id)}
+                                disabled={deletingAddonId === a.id}
+                                className="text-xs font-bold text-red-500 hover:text-red-700 disabled:opacity-50 flex items-center gap-1 transition"
+                              >
+                                <Trash2 size={12} /> {deletingAddonId === a.id ? '…' : 'Delete'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

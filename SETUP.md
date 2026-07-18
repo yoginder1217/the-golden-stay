@@ -63,6 +63,8 @@ supabase/add_weekend_premium.sql
 supabase/add_property_images.sql
 supabase/add_review_count.sql
 supabase/owners_setup.sql
+supabase/reviews_setup.sql
+supabase/addons_setup.sql
 ```
 
 After running `owners_setup.sql`, replace the two admin RLS policies with your actual admin email (the `ALTER DATABASE` approach is not supported in Supabase's SQL editor):

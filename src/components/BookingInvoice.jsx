@@ -5,15 +5,32 @@ const formatDate = (d) =>
 
 const fmt = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
+const getGST = (subtotal, nights) => {
+  if (!subtotal || !nights) return { rate: 0, base: subtotal || 0, gst: 0 };
+  const perNight = subtotal / nights;
+  const rate = perNight > 7500 ? 0.18 : perNight > 1000 ? 0.12 : 0;
+  if (!rate) return { rate: 0, base: subtotal, gst: 0 };
+  const base = Math.round(subtotal / (1 + rate));
+  const gst = subtotal - base;
+  return { rate, base, gst };
+};
+
 const BookingInvoice = React.forwardRef(({ booking }, ref) => {
   const {
     booking_ref, created_at, status,
     property_title, property_location,
     guest_name, guest_email, guest_phone,
     checkin_date, checkout_date, guests, nights,
-    subtotal, cleaning_fee, service_fee, loyalty_discount, total,
-    payment_id,
+    subtotal, cleaning_fee, service_fee,
+    loyalty_discount, promo_discount, promo_code,
+    addons_data, addons_total,
+    total, payment_id,
   } = booking;
+
+  const { rate, base, gst } = getGST(subtotal, nights);
+  const parsedAddons = (() => {
+    try { return JSON.parse(addons_data || '[]'); } catch { return []; }
+  })();
 
   return (
     <div
@@ -33,11 +50,16 @@ const BookingInvoice = React.forwardRef(({ booking }, ref) => {
           <div style={{ fontSize: '26px', fontWeight: '700', color: '#1a1a1a', letterSpacing: '-0.5px' }}>
             The Golden Stay
           </div>
-          <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>Khair, Aligarh, UP · +91 98765 43210</div>
+          <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>Khair, Aligarh, UP · +91 79839 14058</div>
           <div style={{ fontSize: '12px', color: '#888' }}>concierge@goldenstay.com</div>
+          {rate > 0 && (
+            <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>
+              GSTIN: TGS2024UP9999Z (placeholder — update before production)
+            </div>
+          )}
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '22px', fontWeight: '700', color: '#D4AF37' }}>INVOICE</div>
+          <div style={{ fontSize: '22px', fontWeight: '700', color: '#D4AF37' }}>TAX INVOICE</div>
           <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}># {booking_ref}</div>
           {created_at && (
             <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>
@@ -108,20 +130,57 @@ const BookingInvoice = React.forwardRef(({ booking }, ref) => {
           </tr>
         </thead>
         <tbody>
-          {[
-            { label: `Accommodation (${nights} night${nights !== 1 ? 's' : ''})`, value: subtotal },
-            { label: 'Cleaning Fee', value: cleaning_fee },
-            { label: 'Service Fee', value: service_fee },
-          ].map(({ label, value }) => (
-            <tr key={label} style={{ borderBottom: '1px solid #f0f0f0' }}>
-              <td style={{ padding: '12px 14px', fontSize: '13px', color: '#333' }}>{label}</td>
-              <td style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'right' }}>{fmt(value)}</td>
+          {rate > 0 ? (
+            <>
+              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                <td style={{ padding: '12px 14px', fontSize: '13px', color: '#333' }}>
+                  Accommodation — Base ({nights} night{nights !== 1 ? 's' : ''}, excl. GST)
+                </td>
+                <td style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'right' }}>{fmt(base)}</td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                <td style={{ padding: '12px 14px', fontSize: '13px', color: '#555' }}>
+                  GST @ {Math.round(rate * 100)}% (SAC 9963)
+                </td>
+                <td style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'right', color: '#555' }}>{fmt(gst)}</td>
+              </tr>
+            </>
+          ) : (
+            <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+              <td style={{ padding: '12px 14px', fontSize: '13px', color: '#333' }}>
+                Accommodation ({nights} night{nights !== 1 ? 's' : ''})
+              </td>
+              <td style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'right' }}>{fmt(subtotal)}</td>
             </tr>
-          ))}
+          )}
+          <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+            <td style={{ padding: '12px 14px', fontSize: '13px', color: '#333' }}>Cleaning Fee</td>
+            <td style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'right' }}>{fmt(cleaning_fee)}</td>
+          </tr>
+          <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+            <td style={{ padding: '12px 14px', fontSize: '13px', color: '#333' }}>Service Fee</td>
+            <td style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'right' }}>{fmt(service_fee)}</td>
+          </tr>
+          {parsedAddons.length > 0 && (
+            <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+              <td style={{ padding: '12px 14px', fontSize: '13px', color: '#333' }}>
+                Add-ons ({parsedAddons.map(a => a.title).join(', ')})
+              </td>
+              <td style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'right' }}>{fmt(addons_total)}</td>
+            </tr>
+          )}
           {loyalty_discount > 0 && (
             <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
               <td style={{ padding: '12px 14px', fontSize: '13px', color: '#16a34a' }}>Loyalty Points Discount</td>
-              <td style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'right', color: '#16a34a' }}>- {fmt(loyalty_discount)}</td>
+              <td style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'right', color: '#16a34a' }}>− {fmt(loyalty_discount)}</td>
+            </tr>
+          )}
+          {promo_discount > 0 && (
+            <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+              <td style={{ padding: '12px 14px', fontSize: '13px', color: '#16a34a' }}>
+                Promo Discount{promo_code ? ` (${promo_code})` : ''}
+              </td>
+              <td style={{ padding: '12px 14px', fontSize: '13px', textAlign: 'right', color: '#16a34a' }}>− {fmt(promo_discount)}</td>
             </tr>
           )}
         </tbody>
@@ -143,9 +202,14 @@ const BookingInvoice = React.forwardRef(({ booking }, ref) => {
       {/* Footer */}
       <div style={{ borderTop: '2px solid #f0f0f0', paddingTop: '24px', marginTop: '32px', textAlign: 'center', color: '#aaa', fontSize: '12px' }}>
         <p>Thank you for choosing The Golden Stay. We look forward to hosting you.</p>
-        <p style={{ marginTop: '6px' }}>For support: concierge@goldenstay.com · +91 98765 43210</p>
+        <p style={{ marginTop: '6px' }}>For support: concierge@goldenstay.com · +91 79839 14058</p>
+        {rate > 0 && (
+          <p style={{ marginTop: '6px', fontSize: '11px' }}>
+            GST applicable under SAC 9963 · Place of supply: {property_location?.split(',').pop()?.trim() || 'India'}
+          </p>
+        )}
         <p style={{ marginTop: '12px', fontSize: '11px', color: '#ccc' }}>
-          This is a computer-generated invoice and does not require a signature.
+          This is a computer-generated tax invoice and does not require a signature.
         </p>
       </div>
     </div>

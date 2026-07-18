@@ -8,7 +8,7 @@ import { getPropertyQA, askQuestion } from '../lib/qa';
 import { Helmet } from 'react-helmet-async';
 import WishlistButton from '../components/WishlistButton';
 import { StarPicker, StarDisplay } from '../components/StarRating';
-import { getPropertyReviews, submitReview } from '../lib/reviews';
+import { getPropertyReviews, submitReview, getUserReview } from '../lib/reviews';
 import { useAuth } from '../context/AuthContextUtils';
 import { getPropertyAvailability, hasDateConflict, getBlockedDates, hasBlockedConflict } from '../lib/availability';
 import AvailabilityCalendar from '../components/AvailabilityCalendar';
@@ -108,6 +108,7 @@ const PropertyDetails = () => {
   const [reviewError, setReviewError] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState(false);
+  const [existingReview, setExistingReview] = useState(null);
 
   const [showMobileBooking, setShowMobileBooking] = useState(false);
 
@@ -147,6 +148,14 @@ const PropertyDetails = () => {
       getPropertyQA(property.id).then(setQaList).catch(() => {});
     }
   }, [property?.id]);
+
+  useEffect(() => {
+    if (user?.id && property?.id) {
+      getUserReview(user.id, property.id).then(setExistingReview).catch(() => {});
+    } else {
+      setExistingReview(null);
+    }
+  }, [user?.id, property?.id]);
 
   const avgRating = reviews.length
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
@@ -494,6 +503,14 @@ const PropertyDetails = () => {
                   >
                     <LogIn size={15} /> Sign In to Review
                   </Link>
+                </div>
+              ) : existingReview ? (
+                <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-5 py-4 text-sm">
+                  <CheckCircle size={18} className="text-green-600 shrink-0" />
+                  <div>
+                    <p className="font-bold text-green-700">You've already reviewed this property</p>
+                    <p className="text-green-600 text-xs mt-0.5">You rated it {existingReview.rating} star{existingReview.rating !== 1 ? 's' : ''} · "{existingReview.comment}"</p>
+                  </div>
                 </div>
               ) : reviewSuccess ? (
                 <div className="flex items-center gap-2 text-green-600 text-sm font-bold py-3">

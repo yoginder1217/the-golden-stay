@@ -1,17 +1,27 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle, MapPin, Calendar, Users, Hash, CreditCard, Home } from 'lucide-react';
+import { CheckCircle, MapPin, Calendar, Users, Hash, CreditCard, Home, Printer, Receipt } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
+import { useReactToPrint } from 'react-to-print';
+import BookingInvoice from '../components/BookingInvoice';
 
 const formatDate = (dateStr) =>
   dateStr
     ? new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
     : '—';
 
+const getGSTRate = (subtotal, nights) => {
+  if (!subtotal || !nights) return 0;
+  const perNight = subtotal / nights;
+  return perNight > 7500 ? 18 : perNight > 1000 ? 12 : 0;
+};
+
 const BookingSuccess = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
+  const invoiceRef = useRef(null);
+  const handlePrint = useReactToPrint({ contentRef: invoiceRef });
 
   if (!state?.property) {
     return (
@@ -26,7 +36,41 @@ const BookingSuccess = () => {
     );
   }
 
-  const { property, checkin, checkout, guests, nights, total, guestName, guestEmail, paymentId, bookingId } = state;
+  const {
+    property, checkin, checkout, guests, nights, total,
+    guestName, guestEmail, paymentId, bookingId,
+    pointsRedeemed, subtotal, cleaningFee, serviceFee,
+    promoDiscount, promoCode, loyaltyDiscount, addonsTotal, addonsData,
+  } = state;
+
+  const gstRate = getGSTRate(subtotal, nights);
+  const baseAccommodation = gstRate ? Math.round(subtotal / (1 + gstRate / 100)) : subtotal;
+  const gstAmount = gstRate ? subtotal - baseAccommodation : 0;
+
+  // Build booking object for the printable invoice
+  const bookingForInvoice = {
+    booking_ref: bookingId,
+    created_at: new Date().toISOString(),
+    status: 'confirmed',
+    property_title: property.title,
+    property_location: property.location,
+    guest_name: guestName,
+    guest_email: guestEmail,
+    checkin_date: checkin,
+    checkout_date: checkout,
+    guests,
+    nights,
+    subtotal: subtotal || 0,
+    cleaning_fee: cleaningFee || 0,
+    service_fee: serviceFee || 0,
+    loyalty_discount: loyaltyDiscount || 0,
+    promo_discount: promoDiscount || 0,
+    promo_code: promoCode || null,
+    addons_data: addonsData || '[]',
+    addons_total: addonsTotal || 0,
+    total,
+    payment_id: paymentId,
+  };
 
   const summaryItems = [
     { icon: Hash, label: 'Booking ID', value: bookingId },
@@ -43,6 +87,11 @@ const BookingSuccess = () => {
       <Helmet>
         <title>Booking Confirmed | The Golden Stay</title>
       </Helmet>
+
+      {/* Hidden invoice for printing */}
+      <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+        <BookingInvoice ref={invoiceRef} booking={bookingForInvoice} />
+      </div>
 
       <div className="max-w-2xl mx-auto">
         <motion.div
@@ -84,8 +133,44 @@ const BookingSuccess = () => {
               ))}
             </div>
 
+            {/* GST Breakdown */}
+            {gstRate > 0 && (
+              <div className="mt-6 bg-gray-50 border border-gray-100 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Receipt size={14} className="text-golden" />
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Tax Breakdown (GST)</p>
+                </div>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Accommodation (excl. GST)</span>
+                    <span>₹{baseAccommodation?.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>GST @ {gstRate}% (SAC 9963)</span>
+                    <span>₹{gstAmount?.toLocaleString('en-IN')}</span>
+                  </div>
+                  {cleaningFee > 0 && (
+                    <div className="flex justify-between text-gray-600">
+                      <span>Cleaning Fee</span>
+                      <span>₹{Number(cleaningFee).toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  {serviceFee > 0 && (
+                    <div className="flex justify-between text-gray-600">
+                      <span>Service Fee</span>
+                      <span>₹{Number(serviceFee).toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-charcoal pt-2 border-t border-gray-200 mt-1">
+                    <span>Total Paid</span>
+                    <span className="text-golden">₹{total?.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Property Image */}
-            <div className="mt-8 rounded-xl overflow-hidden">
+            <div className="mt-6 rounded-xl overflow-hidden">
               <img
                 src={property.image}
                 alt={property.title}
@@ -107,13 +192,19 @@ const BookingSuccess = () => {
               >
                 View My Bookings
               </Link>
-              <Link
-                to="/"
-                className="flex-1 text-center border border-gray-200 hover:border-golden text-gray-600 hover:text-golden font-bold py-3 rounded-xl transition flex items-center justify-center gap-2"
+              <button
+                onClick={handlePrint}
+                className="flex-1 flex items-center justify-center gap-2 border border-golden text-golden hover:bg-golden hover:text-white font-bold py-3 rounded-xl transition"
               >
-                <Home size={16} /> Return Home
-              </Link>
+                <Printer size={16} /> Download Invoice
+              </button>
             </div>
+            <Link
+              to="/"
+              className="block text-center text-gray-400 hover:text-golden text-sm font-medium mt-4 transition flex items-center justify-center gap-2"
+            >
+              <Home size={14} /> Return Home
+            </Link>
           </div>
         </motion.div>
 
