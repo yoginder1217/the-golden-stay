@@ -12,9 +12,7 @@ import { getPropertyReviews, submitReview, getUserReview } from '../lib/reviews'
 import { useAuth } from '../context/AuthContextUtils';
 import { getPropertyAvailability, hasDateConflict, getBlockedDates, hasBlockedConflict } from '../lib/availability';
 import AvailabilityCalendar from '../components/AvailabilityCalendar';
-
-const CLEANING_FEE = 500;
-const SERVICE_FEE = 300;
+import { CLEANING_FEE, SERVICE_FEE } from '../lib/constants';
 
 const AMENITY_ICONS = {
   'wifi': Wifi,
@@ -167,7 +165,7 @@ const PropertyDetails = () => {
 
   const nights =
     checkin && checkout
-      ? Math.max(1, Math.ceil((new Date(checkout) - new Date(checkin)) / (1000 * 60 * 60 * 24)))
+      ? Math.max(0, Math.ceil((new Date(checkout) - new Date(checkin)) / (1000 * 60 * 60 * 24)))
       : 0;
 
   const dynamicPricing = property
@@ -203,6 +201,10 @@ const PropertyDetails = () => {
   const handleBookDirect = () => {
     if (!checkin || !checkout) {
       setDateError('Please select your check-in and check-out dates to continue.');
+      return;
+    }
+    if (nights === 0) {
+      setDateError('Check-out must be after check-in.');
       return;
     }
     if (hasDateConflict(availability, checkin, checkout)) {
@@ -245,6 +247,7 @@ const PropertyDetails = () => {
         reviewer_name: user.user_metadata?.full_name || user.email.split('@')[0],
       });
       setReviews(prev => [newReview, ...prev]);
+      setExistingReview({ rating: reviewForm.rating, comment: reviewForm.comment.trim() });
       setReviewForm({ rating: 0, comment: '' });
       setReviewSuccess(true);
       setTimeout(() => setReviewSuccess(false), 3000);
@@ -377,7 +380,7 @@ const PropertyDetails = () => {
                   <MapPin size={18} className="text-golden" /> {property.location} • {property.type}
                 </p>
                 <a
-                  href={`https://wa.me/?text=Check out this property on The Golden Stay: ${property.title} in ${property.location} — ₹${property.price.toLocaleString('en-IN')}/night. ${window.location.href}`}
+                  href={`https://wa.me/?text=${encodeURIComponent(`Check out this property on The Golden Stay: ${property.title} in ${property.location} — ₹${property.price.toLocaleString('en-IN')}/night. ${window.location.href}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-xs font-bold text-green-600 border border-green-200 px-3 py-1.5 rounded-full hover:bg-green-50 transition"
@@ -413,12 +416,12 @@ const PropertyDetails = () => {
 
           <h2 className="text-2xl font-bold mb-6 font-serif">About this Homestay</h2>
           <p className="text-gray-600 leading-loose mb-10 text-lg">
-            {property.description} Experience true hospitality with our premium bedding, soundproof windows, and a dedicated workspace. Perfect for families looking to disconnect from the chaos and reconnect with each other.
+            {property.description}
           </p>
 
           <h2 className="text-2xl font-bold mb-6 font-serif">Amenities</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-12">
-            {property.amenities.map((item, idx) => {
+            {(property.amenities || []).map((item, idx) => {
               const AmenityIcon = getAmenityIcon(item);
               return (
                 <div key={idx} className="flex items-center gap-4 text-gray-700 p-4 rounded-xl bg-gray-50 border border-transparent hover:border-golden/30 transition">

@@ -10,6 +10,22 @@ import Testimonials from '../components/Testimonials';
 import FAQ from '../components/FAQ';
 import { Helmet } from 'react-helmet-async';
 
+// Animation Variants
+const fadeInUp = {
+  hidden: { opacity: 0, y: 60 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.2
+    }
+  }
+};
+
 const NewsletterSection = () => {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -49,7 +65,7 @@ const NewsletterSection = () => {
                 type="text"
                 placeholder="Your name (optional)"
                 value={name}
-                onChange={e => setName(e.target.value)}
+                onChange={e => { setName(e.target.value); setStatus('idle'); }}
                 className="flex-none sm:w-36 px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-500 text-sm outline-none focus:ring-2 focus:ring-golden/40"
               />
               <input
@@ -77,22 +93,6 @@ const NewsletterSection = () => {
       </div>
     </section>
   );
-};
-
-// Animation Variants
-const fadeInUp = {
-  hidden: { opacity: 0, y: 60 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
-};
-
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.2
-    }
-  }
 };
 
 const Home = () => {

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -27,6 +28,7 @@ const priceIcon = (price) => new L.DivIcon({
 });
 
 const MapView = ({ properties }) => {
+  const navigate = useNavigate();
   const mapped = properties
     .map(p => ({ ...p, coords: CITY_COORDS[p.city] }))
     .filter(p => p.coords);
@@ -54,6 +56,7 @@ const MapView = ({ properties }) => {
                 </p>
                 <a
                   href={`/property/${p.id}`}
+                  onClick={(e) => { e.preventDefault(); navigate(`/property/${p.id}`); }}
                   style={{ display: 'block', background: '#D4AF37', color: 'white', textAlign: 'center', padding: '6px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, textDecoration: 'none' }}
                 >
                   View Details →

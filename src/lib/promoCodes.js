@@ -24,5 +24,5 @@ export const validatePromoCode = async (code, bookingTotal) => {
     ? `₹${data.discount_value} off (${data.code})`
     : `${data.discount_value}% off (${data.code})`;
 
-  return { discount, label, code: data.code };
+  return { discount, label, code: data.code, discount_type: data.discount_type, discount_value: data.discount_value };
 };

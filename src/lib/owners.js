@@ -11,11 +11,12 @@ export const getOwners = async () => {
 
 export const getMyOwnerProfile = async (userId) => {
   if (!userId) return null;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('property_owners')
     .select('*')
     .eq('user_id', userId)
     .maybeSingle();
+  if (error) throw error;
   return data ?? null;
 };
 

@@ -153,7 +153,7 @@ const Rewards = () => {
                 <div className="flex items-center gap-3">
                   <div className="flex-1 bg-golden/5 border-2 border-dashed border-golden/40 rounded-xl px-5 py-3 text-center">
                     <p className="text-xl font-bold tracking-widest text-golden">{referral.code}</p>
-                    <p className="text-xs text-gray-400 mt-1">Used {referral.uses} time{referral.uses !== 1 ? 's' : ''}</p>
+                    <p className="text-xs text-gray-400 mt-1">Used {referral.uses ?? 0} time{(referral.uses ?? 0) !== 1 ? 's' : ''}</p>
                   </div>
                   <button onClick={copyCode}
                     className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-sm transition ${copied ? 'bg-green-500 text-white' : 'bg-golden text-white hover:bg-golden-dark'}`}>

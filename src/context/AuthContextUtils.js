@@ -5,5 +5,7 @@ export const AuthContext = createContext();
 
 // 2. Create the Custom Hook here
 export const useAuth = () => {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  return context;
 };

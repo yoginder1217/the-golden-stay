@@ -37,8 +37,12 @@ const Dashboard = () => {
   }, [user?.id, fetchBookings]);
 
   const handleCancelBooking = async (bookingId) => {
-    await cancelBooking(bookingId);
-    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' } : b));
+    try {
+      await cancelBooking(bookingId);
+      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' } : b));
+    } catch (err) {
+      alert(err?.message || 'Could not cancel booking. Please try again.');
+    }
   };
 
   const handleUpdateDates = (updated) => {
@@ -48,8 +52,8 @@ const Dashboard = () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const upcoming = bookings.filter(b => new Date(b.checkin_date) >= today);
-  const past = bookings.filter(b => new Date(b.checkin_date) < today);
+  const upcoming = bookings.filter(b => new Date(b.checkin_date) >= today && b.status !== 'cancelled');
+  const past = bookings.filter(b => new Date(b.checkin_date) < today || b.status === 'cancelled');
 
   const totalPoints = useMemo(() =>
     bookings.reduce((s, b) => s + Math.floor((b.total || 0) / 100) - (b.points_redeemed || 0), 0),

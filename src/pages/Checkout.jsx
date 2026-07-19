@@ -23,12 +23,12 @@ const Checkout = () => {
     if (!state?.property) {
       navigate('/properties', { replace: true });
     }
-  }, []);
+  }, [state?.property, navigate]);
 
   const { property, checkin, checkout, guests, nights, subtotal, cleaningFee, serviceFee, total,
     weekendPremium, weekdayNights, weekendNights, weekendPrice } = state || {};
 
-  const hasVariableRates = weekendPremium > 0 && weekendNights > 0 && weekdayNights > 0;
+  const hasVariableRates = weekendPremium > 0 && weekendNights > 0;
 
   const [form, setForm] = useState({ name: '', email: '', phone: '' });
   const [errors, setErrors] = useState({});
@@ -53,7 +53,7 @@ const Checkout = () => {
   }, [user]);
 
   const availablePoints = useMemo(() =>
-    userBookings.reduce((s, b) => s + Math.floor((b.total || 0) / 100) - (b.points_redeemed || 0), 0),
+    Math.max(0, userBookings.reduce((s, b) => s + Math.floor((b.total || 0) / 100) - (b.points_redeemed || 0), 0)),
   [userBookings]);
 
   // Max redeemable: round down to nearest 100, cap at 50% of booking total
@@ -87,7 +87,14 @@ const Checkout = () => {
     }
   };
 
-  const promoDiscount = promoApplied?.discount || 0;
+  const promoDiscount = useMemo(() => {
+    if (!promoApplied) return 0;
+    const base = (total || 0) + addonsTotal;
+    if (promoApplied.discount_type === 'flat') {
+      return Math.min(promoApplied.discount_value, base);
+    }
+    return Math.round(base * promoApplied.discount_value / 100);
+  }, [promoApplied, total, addonsTotal]);
 
   // Add-on packages
   const [availableAddons, setAvailableAddons] = useState([]);
@@ -101,7 +108,7 @@ const Checkout = () => {
   const selectedAddonsList = availableAddons.filter(a => selectedAddons[a.id]);
   const addonsTotal = selectedAddonsList.reduce((s, a) => s + Number(a.price), 0);
 
-  const finalTotal = (total || 0) - promoDiscount - pointsDiscount + addonsTotal;
+  const finalTotal = Math.max(0, (total || 0) - promoDiscount - pointsDiscount + addonsTotal);
 
   if (!state?.property) return null;
 
@@ -181,6 +188,25 @@ const Checkout = () => {
           status: 'confirmed',
         });
 
+        // Decrement promo code uses_left if it has a finite use limit (non-blocking, optimistic locking)
+        if (promoApplied?.code) {
+          supabase
+            .from('promo_codes')
+            .select('uses_left')
+            .eq('code', promoApplied.code)
+            .single()
+            .then(({ data: pd }) => {
+              if (pd && pd.uses_left !== -1 && pd.uses_left > 0) {
+                return supabase
+                  .from('promo_codes')
+                  .update({ uses_left: pd.uses_left - 1 })
+                  .eq('code', promoApplied.code)
+                  .eq('uses_left', pd.uses_left);
+              }
+            })
+            .catch(() => {});
+        }
+
         // In-app notification (non-blocking)
         createNotification({
           user_id: user.id,
@@ -225,6 +251,7 @@ const Checkout = () => {
         });
       } catch (err) {
         console.error('Booking save failed:', err.message);
+        setLoading(false);
         alert('Your payment was received but booking could not be saved. Please contact support with payment ID: ' + paymentId);
       }
     };

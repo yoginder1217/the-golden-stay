@@ -5,11 +5,12 @@ const generateCode = (email) =>
   Math.random().toString(36).slice(2, 5).toUpperCase();
 
 export const getOrCreateReferralCode = async (userId, email) => {
-  const { data: existing } = await supabase
+  const { data: existing, error: fetchError } = await supabase
     .from('referral_codes')
     .select('*')
     .eq('user_id', userId)
     .single();
+  if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
   if (existing) return existing;
 
   const code = generateCode(email);

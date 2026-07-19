@@ -29,6 +29,7 @@ export const usePushNotifications = () => {
   const [permission, setPermission] = useState('default');
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [subscribeError, setSubscribeError] = useState('');
 
   useEffect(() => {
     const ok = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -67,8 +68,9 @@ export const usePushNotifications = () => {
           icon: '/favicon.png',
         });
       }
-    } catch {}
-    finally { setLoading(false); }
+    } catch (err) {
+      setSubscribeError(err?.message || 'Failed to enable notifications. Please try again.');
+    } finally { setLoading(false); }
   };
 
   const unsubscribe = async () => {
@@ -85,5 +87,5 @@ export const usePushNotifications = () => {
     finally { setLoading(false); }
   };
 
-  return { supported, permission, subscribed, loading, subscribe, unsubscribe };
+  return { supported, permission, subscribed, loading, subscribeError, subscribe, unsubscribe };
 };

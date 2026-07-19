@@ -5,17 +5,12 @@ import { CheckCircle, MapPin, Calendar, Users, Hash, CreditCard, Home, Printer, 
 import { Helmet } from 'react-helmet-async';
 import { useReactToPrint } from 'react-to-print';
 import BookingInvoice from '../components/BookingInvoice';
+import { getGST } from '../lib/constants';
 
 const formatDate = (dateStr) =>
   dateStr
     ? new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
     : '—';
-
-const getGSTRate = (subtotal, nights) => {
-  if (!subtotal || !nights) return 0;
-  const perNight = subtotal / nights;
-  return perNight > 7500 ? 18 : perNight > 1000 ? 12 : 0;
-};
 
 const BookingSuccess = () => {
   const { state } = useLocation();
@@ -43,9 +38,8 @@ const BookingSuccess = () => {
     promoDiscount, promoCode, loyaltyDiscount, addonsTotal, addonsData,
   } = state;
 
-  const gstRate = getGSTRate(subtotal, nights);
-  const baseAccommodation = gstRate ? Math.round(subtotal / (1 + gstRate / 100)) : subtotal;
-  const gstAmount = gstRate ? subtotal - baseAccommodation : 0;
+  const { rate: gstDecimal, base: baseAccommodation, gst: gstAmount } = getGST(subtotal, nights);
+  const gstRate = Math.round(gstDecimal * 100);
 
   // Build booking object for the printable invoice
   const bookingForInvoice = {

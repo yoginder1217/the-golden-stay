@@ -79,7 +79,7 @@ const BookingCard = ({ booking, onCancel, onUpdateDates }) => {
     ? Math.max(1, Math.ceil((new Date(newCheckout) - new Date(newCheckin)) / 86400000))
     : 0;
   const newSubtotal = pricePerNight * newNights;
-  const newTotal = newSubtotal + (cleaning_fee || 500) + (service_fee || 300) - (loyalty_discount || 0);
+  const newTotal = newSubtotal + (cleaning_fee || 500) + (service_fee || 300) - (loyalty_discount || 0) + (booking.addons_total || 0) - (booking.promo_discount || 0);
 
   const minNewCheckout = newCheckin
     ? new Date(new Date(newCheckin).getTime() + 86400000).toISOString().split('T')[0]
@@ -94,7 +94,7 @@ const BookingCard = ({ booking, onCancel, onUpdateDates }) => {
       // Check availability, excluding the current booking's own date range
       const allAvailability = await getPropertyAvailability(property_id);
       const otherBookings = allAvailability.filter(
-        r => !(r.checkin_date === checkin_date && r.checkout_date === checkout_date)
+        r => !(r.checkin_date?.slice(0, 10) === checkin_date && r.checkout_date?.slice(0, 10) === checkout_date)
       );
       if (hasDateConflict(otherBookings, newCheckin, newCheckout)) {
         setEditError('Those dates are already booked. Please choose different dates.');

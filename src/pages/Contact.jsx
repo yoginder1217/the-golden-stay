@@ -96,9 +96,9 @@ const Contact = () => {
           </motion.div>
 
           <div className="mt-12 flex gap-4">
-             <div className="p-3 bg-white/5 rounded-full hover:bg-golden hover:text-charcoal transition cursor-pointer"><Facebook size={20} /></div>
-             <div className="p-3 bg-white/5 rounded-full hover:bg-golden hover:text-charcoal transition cursor-pointer"><Instagram size={20} /></div>
-             <div className="p-3 bg-white/5 rounded-full hover:bg-golden hover:text-charcoal transition cursor-pointer"><Twitter size={20} /></div>
+             <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="p-3 bg-white/5 rounded-full hover:bg-golden hover:text-charcoal transition text-white"><Facebook size={20} /></a>
+             <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="p-3 bg-white/5 rounded-full hover:bg-golden hover:text-charcoal transition text-white"><Instagram size={20} /></a>
+             <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="p-3 bg-white/5 rounded-full hover:bg-golden hover:text-charcoal transition text-white"><Twitter size={20} /></a>
           </div>
         </div>
 

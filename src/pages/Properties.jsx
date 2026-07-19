@@ -77,7 +77,7 @@ const Properties = () => {
       p.location?.toLowerCase().includes(locationQuery.toLowerCase()) ||
       p.title?.toLowerCase().includes(locationQuery.toLowerCase()) ||
       p.city?.toLowerCase().includes(locationQuery.toLowerCase());
-    const matchesGuests = !guestCount || guestCount <= 12;
+    const matchesGuests = !guestCount || (property.maxGuests && property.maxGuests >= guestCount);
     const matchesMin = !minPrice || p.price >= parseInt(minPrice);
     const matchesMax = !maxPrice || p.price <= parseInt(maxPrice);
     const matchesAmenities = selectedAmenities.length === 0 ||

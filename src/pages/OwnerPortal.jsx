@@ -40,6 +40,7 @@ const OwnerPortal = () => {
   const [bookings, setBookings] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
+  const [portalError, setPortalError] = useState('');
 
   const fetchAll = useCallback(async () => {
     if (!user) { navigate('/login'); return; }
@@ -60,8 +61,8 @@ const OwnerPortal = () => {
         const bkgs = await getOwnerBookings(props.map(p => p.id));
         setBookings(bkgs);
       }
-    } catch {
-      navigate('/');
+    } catch (err) {
+      setPortalError(err?.message || 'Failed to load your portal. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -97,6 +98,22 @@ const OwnerPortal = () => {
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
         </svg>
+      </div>
+    );
+  }
+
+  if (portalError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center">
+          <p className="text-red-500 mb-4 font-medium">{portalError}</p>
+          <button
+            onClick={() => { setPortalError(''); fetchAll(); }}
+            className="px-5 py-2 bg-golden hover:bg-golden-dark text-white font-bold rounded-xl transition"
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }

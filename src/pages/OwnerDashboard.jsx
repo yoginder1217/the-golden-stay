@@ -27,6 +27,7 @@ import { getAllReviews, deleteReview } from '../lib/reviews';
 import { getAllAddons, saveAddon, deleteAddon, toggleAddonActive } from '../lib/addons';
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
+if (!ADMIN_EMAIL) console.warn('[OwnerDashboard] VITE_ADMIN_EMAIL is not set — admin access will be denied for all users.');
 const PAGE_SIZE = 10;
 
 const fmt = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
@@ -205,28 +206,28 @@ const OwnerDashboard = () => {
         });
         return next;
       });
-    } catch {}
+    } catch (err) { console.error('Failed to load properties:', err); setError(err?.message || 'Failed to load properties.'); }
     finally { setPropertiesLoading(false); }
   }, []);
 
   const fetchOwners = useCallback(async () => {
     setOwnersLoading(true);
-    try { setOwners(await getOwners()); } catch {} finally { setOwnersLoading(false); }
+    try { setOwners(await getOwners()); } catch (err) { console.error('Failed to load owners:', err); setError(err?.message || 'Failed to load owners.'); } finally { setOwnersLoading(false); }
   }, []);
 
   const fetchPayoutsAdmin = useCallback(async () => {
     setPayoutsLoading(true);
-    try { setAllPayouts(await getPayouts()); } catch {} finally { setPayoutsLoading(false); }
+    try { setAllPayouts(await getPayouts()); } catch (err) { console.error('Failed to load payouts:', err); setError(err?.message || 'Failed to load payouts.'); } finally { setPayoutsLoading(false); }
   }, []);
 
   const fetchReviewsAdmin = useCallback(async () => {
     setReviewsLoading(true);
-    try { setAllReviews(await getAllReviews()); } catch {} finally { setReviewsLoading(false); }
+    try { setAllReviews(await getAllReviews()); } catch (err) { console.error('Failed to load reviews:', err); setError(err?.message || 'Failed to load reviews.'); } finally { setReviewsLoading(false); }
   }, []);
 
   const fetchAddonsAdmin = useCallback(async () => {
     setAddonsLoading(true);
-    try { setAddonsData(await getAllAddons()); } catch {} finally { setAddonsLoading(false); }
+    try { setAddonsData(await getAllAddons()); } catch (err) { console.error('Failed to load add-ons:', err); setError(err?.message || 'Failed to load add-ons.'); } finally { setAddonsLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -615,9 +616,15 @@ const OwnerDashboard = () => {
 
   const fetchPromos = useCallback(async () => {
     setPromosLoading(true);
-    const { data } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
-    setPromos(data || []);
-    setPromosLoading(false);
+    try {
+      const { data, error } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      setPromos(data || []);
+    } catch (err) {
+      alert('Failed to load promo codes: ' + (err.message || 'Unknown error'));
+    } finally {
+      setPromosLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -666,14 +673,24 @@ const OwnerDashboard = () => {
   };
 
   const togglePromoActive = async (code, current) => {
-    await supabase.from('promo_codes').update({ is_active: !current }).eq('code', code);
-    setPromos(prev => prev.map(p => p.code === code ? { ...p, is_active: !current } : p));
+    try {
+      const { error } = await supabase.from('promo_codes').update({ is_active: !current }).eq('code', code);
+      if (error) throw error;
+      setPromos(prev => prev.map(p => p.code === code ? { ...p, is_active: !current } : p));
+    } catch (err) {
+      alert('Failed to update promo: ' + (err.message || 'Unknown error'));
+    }
   };
 
   const deletePromo = async (code) => {
     if (!window.confirm(`Delete promo code ${code}?`)) return;
-    await supabase.from('promo_codes').delete().eq('code', code);
-    setPromos(prev => prev.filter(p => p.code !== code));
+    try {
+      const { error } = await supabase.from('promo_codes').delete().eq('code', code);
+      if (error) throw error;
+      setPromos(prev => prev.filter(p => p.code !== code));
+    } catch (err) {
+      alert('Failed to delete promo: ' + (err.message || 'Unknown error'));
+    }
   };
 
   const totalRevenue = useMemo(() => bookings.reduce((s, b) => s + (b.total || 0), 0), [bookings]);
