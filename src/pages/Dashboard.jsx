@@ -6,6 +6,7 @@ import BookingCard from '../components/BookingCard';
 import { Helmet } from 'react-helmet-async';
 import { Home, Calendar, User, LogOut, RefreshCw, Heart, Award, Settings, Bell, BellOff, Star } from 'lucide-react';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { supabase } from '../lib/supabase';
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -38,8 +39,28 @@ const Dashboard = () => {
 
   const handleCancelBooking = async (bookingId) => {
     try {
+      // Look up booking BEFORE updating state so we have the data for the email
+      const booking = bookings.find(b => b.id === bookingId);
       await cancelBooking(bookingId);
       setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' } : b));
+
+      // Fire cancellation confirmation email (non-blocking)
+      if (booking?.guest_email) {
+        supabase.functions.invoke('send-cancellation-email', {
+          body: {
+            guest_email: booking.guest_email,
+            guest_name:  booking.guest_name,
+            booking_ref: booking.booking_ref,
+            property_title:    booking.property_title,
+            property_location: booking.property_location,
+            checkin_date:  booking.checkin_date,
+            checkout_date: booking.checkout_date,
+            nights: booking.nights,
+            guests: booking.guests,
+            total:  booking.total,
+          },
+        }).catch(() => {});
+      }
     } catch (err) {
       alert(err?.message || 'Could not cancel booking. Please try again.');
     }

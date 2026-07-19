@@ -25,6 +25,7 @@ import {
 } from '../lib/owners';
 import { getAllReviews, deleteReview } from '../lib/reviews';
 import { getAllAddons, saveAddon, deleteAddon, toggleAddonActive } from '../lib/addons';
+import AnalyticsDashboard from '../components/AnalyticsDashboard';
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
 if (!ADMIN_EMAIL) console.warn('[OwnerDashboard] VITE_ADMIN_EMAIL is not set — admin access will be denied for all users.');
@@ -150,6 +151,25 @@ const OwnerDashboard = () => {
   const [addonSaving, setAddonSaving] = useState(false);
   const [addonFormError, setAddonFormError] = useState('');
   const [deletingAddonId, setDeletingAddonId] = useState(null);
+
+  // Email reminder trigger
+  const [reminderSending, setReminderSending] = useState(false);
+  const [reminderResult, setReminderResult] = useState(null);
+
+  const handleSendReminders = async () => {
+    setReminderSending(true);
+    setReminderResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-checkin-reminder', { body: {} });
+      if (error) throw error;
+      setReminderResult({ ok: true, msg: `${data?.sent ?? 0} reminder${data?.sent !== 1 ? 's' : ''} sent for ${data?.date ?? 'tomorrow'}.` });
+    } catch (err) {
+      setReminderResult({ ok: false, msg: err?.message || 'Failed to trigger reminders.' });
+    } finally {
+      setReminderSending(false);
+      setTimeout(() => setReminderResult(null), 6000);
+    }
+  };
 
   // Content CMS tab
   const { c, cJSON, setContent: setLiveContent, contentMap } = useSiteContent();
@@ -788,6 +808,7 @@ const OwnerDashboard = () => {
   ];
 
   const tabs = [
+    { id: 'analytics', label: 'Analytics', icon: BarChart2 },
     { id: 'bookings', label: 'All Bookings', icon: Users },
     { id: 'properties', label: 'Properties', icon: Home },
     { id: 'guests', label: 'Guest History', icon: Calendar },
@@ -1150,12 +1171,32 @@ const OwnerDashboard = () => {
             </div>
             <p className="text-gray-500 text-sm">Revenue analytics and booking management</p>
           </div>
-          <button
-            onClick={fetchBookings}
-            className="flex items-center gap-2 text-sm font-bold text-golden border border-golden/30 hover:bg-golden/5 px-4 py-2 rounded-full transition self-start sm:self-auto"
-          >
-            <RefreshCw size={14} /> Refresh
-          </button>
+          <div className="flex flex-col items-start sm:items-end gap-2 self-start sm:self-auto">
+            <div className="flex gap-2">
+              <button
+                onClick={fetchBookings}
+                className="flex items-center gap-2 text-sm font-bold text-golden border border-golden/30 hover:bg-golden/5 px-4 py-2 rounded-full transition"
+              >
+                <RefreshCw size={14} /> Refresh
+              </button>
+              <button
+                onClick={handleSendReminders}
+                disabled={reminderSending}
+                className="flex items-center gap-2 text-sm font-bold text-blue-600 border border-blue-200 hover:bg-blue-50 px-4 py-2 rounded-full transition disabled:opacity-50"
+                title="Send pre-stay reminder emails to guests checking in tomorrow"
+              >
+                {reminderSending
+                  ? <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                  : <Send size={13} />}
+                {reminderSending ? 'Sending…' : "Tomorrow's Reminders"}
+              </button>
+            </div>
+            {reminderResult && (
+              <span className={`text-xs font-bold px-3 py-1 rounded-full ${reminderResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                {reminderResult.msg}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -2691,6 +2732,15 @@ const OwnerDashboard = () => {
               )}
             </div>
           </div>
+        )}
+
+        {/* ── ANALYTICS TAB ── */}
+        {activeTab === 'analytics' && (
+          <AnalyticsDashboard
+            bookings={bookings}
+            propertiesData={propertiesData}
+            loading={loading}
+          />
         )}
 
       </div>

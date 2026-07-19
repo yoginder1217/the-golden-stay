@@ -30,6 +30,7 @@ import Wishlist from './pages/Wishlist';
 import Profile from './pages/Profile';
 import RefundPolicy from './pages/RefundPolicy';
 import Rewards from './pages/Rewards';
+import BecomeHost from './pages/BecomeHost';
 
 function RoutedMain() {
   const location = useLocation();
@@ -49,6 +50,7 @@ function RoutedMain() {
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/refund-policy" element={<RefundPolicy />} />
+              <Route path="/become-a-host" element={<BecomeHost />} />
 
               {/* Semi-protected: accessible but guards itself via useEffect */}
               <Route path="/checkout" element={<Checkout />} />

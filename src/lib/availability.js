@@ -54,3 +54,25 @@ export const hasBlockedConflict = (blockedRanges, newCheckin, newCheckout) => {
     return newStart < new Date(end_date) && newEnd > new Date(start_date);
   });
 };
+
+// Returns a Set of property IDs that are unavailable for the given date range
+export const getUnavailablePropertyIds = async (checkin, checkout) => {
+  const [{ data: booked, error: e1 }, { data: blocked, error: e2 }] = await Promise.all([
+    supabase
+      .from('property_availability')
+      .select('property_id')
+      .lt('checkin_date', checkout)
+      .gt('checkout_date', checkin),
+    supabase
+      .from('blocked_dates')
+      .select('property_id')
+      .lt('start_date', checkout)
+      .gt('end_date', checkin),
+  ]);
+  if (e1) throw e1;
+  if (e2) throw e2;
+  return new Set([
+    ...(booked || []).map(b => b.property_id),
+    ...(blocked || []).map(b => b.property_id),
+  ]);
+};

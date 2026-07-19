@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
 import { useSearchParams, Link } from 'react-router-dom';
 import { getProperties } from '../lib/properties';
+import { getUnavailablePropertyIds } from '../lib/availability';
 import PropertyCard from '../components/PropertyCard';
 import MapView from '../components/MapView';
 import { X, MapPin, SlidersHorizontal, LayoutGrid, Map, Clock, ChevronDown, ChevronUp, Calendar, Users } from 'lucide-react';
@@ -31,6 +32,10 @@ const Properties = () => {
   const [maxPrice, setMaxPrice] = useState('');
   const [selectedAmenities, setSelectedAmenities] = useState([]);
   const [recentlyViewed, setRecentlyViewed] = useState([]);
+  const [checkinFilter, setCheckinFilter] = useState('');
+  const [checkoutFilter, setCheckoutFilter] = useState('');
+  const [unavailableIds, setUnavailableIds] = useState(null);
+  const [datesLoading, setDatesLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -52,6 +57,29 @@ const Properties = () => {
     } catch {}
   }, [allProperties]);
 
+  // Pre-populate date filters from URL search params (homepage search)
+  useEffect(() => {
+    const cin = searchParams.get('checkin') || '';
+    const cout = searchParams.get('checkout') || '';
+    if (cin) setCheckinFilter(cin);
+    if (cout) setCheckoutFilter(cout);
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch unavailable property IDs whenever both dates are set
+  useEffect(() => {
+    if (!checkinFilter || !checkoutFilter) {
+      setUnavailableIds(null);
+      return;
+    }
+    let cancelled = false;
+    setDatesLoading(true);
+    getUnavailablePropertyIds(checkinFilter, checkoutFilter)
+      .then(ids => { if (!cancelled) setUnavailableIds(ids); })
+      .catch(() => { if (!cancelled) setUnavailableIds(null); })
+      .finally(() => { if (!cancelled) setDatesLoading(false); });
+    return () => { cancelled = true; };
+  }, [checkinFilter, checkoutFilter]);
+
   const allAmenities = useMemo(() => {
     const set = new Set();
     allProperties.forEach(p => p.amenities?.forEach(a => set.add(a)));
@@ -60,10 +88,17 @@ const Properties = () => {
 
   const locationQuery = searchParams.get('location') || '';
   const checkinQuery = searchParams.get('checkin') || '';
+  const checkoutQuery = searchParams.get('checkout') || '';
   const guestsQuery = searchParams.get('guests') || '';
-  const hasSearchQuery = locationQuery || checkinQuery || guestsQuery;
-  const clearSearch = () => { setSearchParams({}); setActiveCity('All'); };
+  const hasSearchQuery = locationQuery || checkinQuery || checkoutQuery || guestsQuery;
+  const clearDates = () => { setCheckinFilter(''); setCheckoutFilter(''); setUnavailableIds(null); };
+  const clearSearch = () => { setSearchParams({}); setActiveCity('All'); clearDates(); };
   const guestCount = parseInt(guestsQuery, 10) || 0;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const minCheckoutStr = checkinFilter
+    ? new Date(new Date(checkinFilter).getTime() + 86400000).toISOString().split('T')[0]
+    : todayStr;
 
   const activeFilterCount = [
     minPrice, maxPrice,
@@ -77,12 +112,13 @@ const Properties = () => {
       p.location?.toLowerCase().includes(locationQuery.toLowerCase()) ||
       p.title?.toLowerCase().includes(locationQuery.toLowerCase()) ||
       p.city?.toLowerCase().includes(locationQuery.toLowerCase());
-    const matchesGuests = !guestCount || (property.maxGuests && property.maxGuests >= guestCount);
+    const matchesGuests = !guestCount || (p.maxGuests && p.maxGuests >= guestCount);
     const matchesMin = !minPrice || p.price >= parseInt(minPrice);
     const matchesMax = !maxPrice || p.price <= parseInt(maxPrice);
     const matchesAmenities = selectedAmenities.length === 0 ||
       selectedAmenities.every(a => p.amenities?.includes(a));
-    return matchesType && matchesCity && matchesLocation && matchesGuests && matchesMin && matchesMax && matchesAmenities;
+    const matchesDates = !checkinFilter || !checkoutFilter || !unavailableIds || !unavailableIds.has(p.id);
+    return matchesType && matchesCity && matchesLocation && matchesGuests && matchesMin && matchesMax && matchesAmenities && matchesDates;
   });
 
   const toggleAmenity = (a) => setSelectedAmenities(prev =>
@@ -93,6 +129,7 @@ const Properties = () => {
     setMinPrice(''); setMaxPrice(''); setSelectedAmenities([]);
     setActiveFilter('All'); setActiveCity('All');
     setSearchParams({});
+    clearDates();
   };
 
   return (
@@ -165,6 +202,43 @@ const Properties = () => {
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Date availability filter */}
+          <div className="flex flex-wrap items-center gap-3 py-3 border-t border-gray-100 mt-3">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 shrink-0">
+              <Calendar size={12} className="text-golden" /> Availability
+            </span>
+            <input
+              type="date"
+              value={checkinFilter}
+              min={todayStr}
+              onChange={e => { setCheckinFilter(e.target.value); setCheckoutFilter(''); setUnavailableIds(null); }}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-golden/30 [color-scheme:light]"
+            />
+            <span className="text-gray-400 text-xs shrink-0">→</span>
+            <input
+              type="date"
+              value={checkoutFilter}
+              min={minCheckoutStr}
+              disabled={!checkinFilter}
+              onChange={e => setCheckoutFilter(e.target.value)}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-golden/30 disabled:opacity-40 disabled:cursor-not-allowed [color-scheme:light]"
+            />
+            {datesLoading && (
+              <span className="text-xs text-golden animate-pulse">Checking availability…</span>
+            )}
+            {checkinFilter && checkoutFilter && !datesLoading && unavailableIds && (
+              <span className="text-xs text-green-600 font-bold">
+                {filteredProperties.length} {filteredProperties.length === 1 ? 'property' : 'properties'} available
+              </span>
+            )}
+            {(checkinFilter || checkoutFilter) && (
+              <button onClick={clearDates}
+                className="text-xs text-gray-400 hover:text-red-500 transition flex items-center gap-1">
+                <X size={10} /> Clear dates
+              </button>
+            )}
           </div>
 
           {/* Row 2: City filters */}
@@ -242,7 +316,13 @@ const Properties = () => {
             className="mt-6 p-4 bg-white rounded-xl border border-golden/20 shadow-sm flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 items-center">
             <span className="font-bold text-charcoal">Search results:</span>
             {locationQuery && <span className="flex items-center gap-1"><MapPin size={12} className="text-golden shrink-0" /> <strong>{locationQuery}</strong></span>}
-            {checkinQuery && <span className="flex items-center gap-1"><Calendar size={12} className="text-golden shrink-0" /> <strong>{new Date(checkinQuery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>}
+            {checkinQuery && (
+              <span className="flex items-center gap-1">
+                <Calendar size={12} className="text-golden shrink-0" />
+                <strong>{new Date(checkinQuery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong>
+                {checkoutQuery && <> → <strong>{new Date(checkoutQuery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></>}
+              </span>
+            )}
             {guestsQuery && <span className="flex items-center gap-1"><Users size={12} className="text-golden shrink-0" /> <strong>{guestsQuery} guests</strong></span>}
             <span className="text-golden font-bold">{filteredProperties.length} found</span>
             <button onClick={clearSearch} className="ml-auto flex items-center gap-1 text-golden-dark font-bold hover:underline text-xs">

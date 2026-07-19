@@ -230,6 +230,9 @@ const Checkout = () => {
             nights,
             total: finalTotal,
             loyalty_discount: pointsDiscount,
+            promo_discount: promoDiscount,
+            promo_code: promoApplied?.code || null,
+            addons_total: addonsTotal,
           },
         }).catch(() => {});
 
